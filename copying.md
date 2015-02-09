@@ -22,7 +22,7 @@ reason, please contact us.
 
 A full list of all openage authors ("contributors") can also be determined
 from the VCS, e.g. via `git shortlog -sne`, or conveniently looked up on
-[the GitHub web interface](https://github.com/SFTtech/openage/graphs/contributors).
+[the GitHub web interface](https://github.com/SFTtech/openage-masterserver/graphs/contributors).
 
 Details on individual authorships of files can be obtained via the VCS,
 e.g. via `git blame`, or the GitHub web interface.
@@ -65,9 +65,7 @@ source projects, require the following, longer header:
     (Modifications|Other (data|code)|Everything else) Copyright 2014-2014 the openage authors.
     See copying.md for further legal info.
 
-For even more details, see the [regular expressions](py/openage/codecompliance/legal.py).
-
-In addition to the openage header, the file's original license header should
+In addition to the openage legal header, the file's original license header should
 be retained if in doubt.
 
 The "license" line is required only if the file is not licensed as

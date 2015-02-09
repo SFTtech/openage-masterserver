@@ -9,7 +9,6 @@
 *.a
 *.so
 *.s
-*.hi
 
 # python bytecode
 *.pyc
@@ -28,3 +27,19 @@ callgrind.out.*
 perf.data*
 .gdb_history
 
+# haskell stuff
+*.o
+*.hi
+*.chi
+*.chs.h
+*.prof
+*.hp
+.hpc
+.hsenv
+
+# cabal packaging
+dist/
+cabal-dev/
+.cabal-sandbox/
+cabal.sandbox.config
+cabal.config
