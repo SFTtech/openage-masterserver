@@ -5,16 +5,17 @@ import Network.Socket
 import System.IO
 
 {-
-sends a simple ohai to a tcp socket on port 4242
--}
+ - sends a simple ohai to a tcp socket on port 4242
+ -}
 
 main :: IO ()
 main = do
+  let port = 4242
   putStrLn "openage matchmaking and lobby server"
-  putStrLn "listening on port 4242..."
+  putStrLn $ "listening on port " ++ show port
   sock <- socket AF_INET Stream 0
   setSocketOption sock ReuseAddr 1
-  bindSocket sock (SockAddrInet 4242 iNADDR_ANY)
+  bindSocket sock (SockAddrInet port iNADDR_ANY)
   listen sock 2
   mainLoop sock
 
@@ -22,11 +23,13 @@ main = do
 mainLoop :: Socket -> IO ()
 mainLoop sock = do
   conn <- accept sock
-  forkIO (runConn conn)
+  _ <- forkIO (runConn conn)
   mainLoop sock
 
 -- per-connection action
-runConn (sock, _) = do
+runConn :: (Socket, SockAddr) -> IO ()
+runConn (sock, addr) = do
+  putStrLn $ "connection: " ++ show addr
   hdl <- socketToHandle sock ReadWriteMode
   hSetBuffering hdl NoBuffering
   hPutStrLn hdl "ohai"
