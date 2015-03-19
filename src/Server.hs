@@ -7,15 +7,20 @@ import System.IO
 
 import qualified Network.Socket as Sock
 
-listenSock :: IO ()
-listenSock = do
-  let port = 4242
+import qualified Config as Cfg
+
+-- tcp accept queues
+qsize = 4
+
+listenSock :: Cfg.Config -> IO ()
+listenSock cfg = do
+  let port = fromIntegral (Cfg.netPort cfg)
   putStrLn "openage matchmaking and lobby server"
   putStrLn ("listening on port " ++ show port)
   sock <- Sock.socket Sock.AF_INET6 Sock.Stream 0
   Sock.setSocketOption sock Sock.ReuseAddr 1
   Sock.bind sock (Sock.SockAddrInet6 port 0 Sock.iN6ADDR_ANY 0)
-  Sock.listen sock 2
+  Sock.listen sock qsize
   acceptLoop sock
 
 -- handle connections from the socket

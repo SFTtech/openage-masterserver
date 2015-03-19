@@ -18,20 +18,22 @@ type DBPassword = String
 
 -- the config file has these entries
 data Config = Config {
+  netPort    :: Int,
   dbHost     :: DBHost,
   dbName     :: DBName,
   dbUser     :: DBUser,
   dbPassword :: DBPassword
-  } deriving (Show)
+} deriving (Show)
 
 -- convert the string -> string map to our wanted config
 createConfig :: StringMap -> Maybe Config
 createConfig m = do
+  port <- Map.lookup "port" m
   dbhost <- Map.lookup "db_host" m
   dbname <- Map.lookup "db_name" m
   dbuser <- Map.lookup "db_user" m
   dbpass <- Map.lookup "db_password" m
-  Just (Config dbhost dbname dbuser dbpass)
+  Just (Config (read port) dbhost dbname dbuser dbpass)
 
 
 type StringMap = Map.Map String String
