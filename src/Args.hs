@@ -2,8 +2,8 @@
 
 module Args where
 
-import System.Exit
 import Text.Printf
+import qualified System.Exit as Exit
 import qualified Data.Map.Strict as Map
 import qualified Util
 
@@ -44,7 +44,7 @@ parseArgs args opts usage =
      faild = putStrLn usage >> die
 
 exit :: IO ()
-exit = exitWith (ExitSuccess)
+exit = Exit.exitWith (Exit.ExitSuccess)
 
 die :: IO ()
-die = exitWith (ExitFailure 1)
+die = Exit.exitWith (Exit.ExitFailure 1)
