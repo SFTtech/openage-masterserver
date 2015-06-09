@@ -8,14 +8,13 @@
  -}
 module Main where
 
-import qualified Data.Version as Ver
-import qualified Paths_openage_masterserver as Prg
 import qualified System.Environment as Env
 
 import qualified Args
 import qualified Config as Cfg
 import qualified Database as DB
 import qualified Server as Srv
+import qualified Version as Ver
 
 -- | available program run modes.
 data Action = Serve | InitDB
@@ -28,7 +27,7 @@ opts = [("help",   ("show things that may help you", (Args.NoOpt (putStrLn help 
 
 -- | generate a string that displays the command line usage of this server.
 usage :: String
-usage = ("== openage master server " ++ (Ver.showVersion Prg.version)
+usage = ("== " ++ Ver.programVersion
          ++ " ==\n\n"
          ++ "usage: binary <mode> <mode options>\n\n"
          ++ (Args.modeString opts "available modes:\n"))

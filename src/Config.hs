@@ -9,20 +9,13 @@ import Text.ParserCombinators.Parsec
 import qualified Data.Map as Map
 
 
-type DBHost = String
-type DBName = String
-type DBUser = String
-type DBPassword = String
-
-
-
 -- the config file has these entries
 data Config = Config {
   netPort    :: Int,
-  dbHost     :: DBHost,
-  dbName     :: DBName,
-  dbUser     :: DBUser,
-  dbPassword :: DBPassword
+  dbHost     :: String,
+  dbName     :: String,
+  dbUser     :: String,
+  dbPassword :: String
 } deriving (Show)
 
 -- convert the string -> string map to our wanted config
