@@ -7,7 +7,6 @@ import Control.Monad
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as TXT
-import qualified Data.Version as DVer
 
 import qualified BiMap
 import qualified Version as Ver
@@ -21,7 +20,7 @@ class NetMsg a where
 data VersionMessage = VersionMessage {
   peerSoftware :: String,
   peerType :: PeerType,
-  peerProtocolVersion :: DVer.Version
+  peerProtocolVersion :: Ver.Version
   } deriving Show
 
 instance NetMsg VersionMessage where
@@ -77,8 +76,8 @@ instance NetMsg CompatibilityMessage where
 
 
 -- | Communication protocol version.
-version :: DVer.Version
-version = DVer.makeVersion [0, 0]
+version :: Ver.Version
+version = Ver.makeVersion [0, 0]
 
 serverVersion :: VersionMessage
 serverVersion = VersionMessage{peerSoftware=(Ver.identifier), peerType=(Masterserver), peerProtocolVersion=(version)}
