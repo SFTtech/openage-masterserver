@@ -41,25 +41,19 @@ identifier = do
 
 -- comment parser
 comment :: Parser ()
-comment = do
-  _ <- char '#'
-  skipMany (noneOf "\n")
-  <?> "comment"
+comment = char '#' >> skipMany (noneOf "\n") <?> "comment"
 
 
 -- end of line parser
 eol :: Parser ()
-eol = do
-  _ <- oneOf "\n"
-  return ()
-  <?> "end of line"
+eol = oneOf "\n" >> return () <?> "end of line"
 
 -- single line parser
 item :: Parser (String, String)
 item = do
   key <- identifier     -- config entry key
   skipMany space
-  _ <- char '='         -- aand assign a value to that key
+  char '='         -- aand assign a value to that key
   skipMany space
   value <- manyTill anyChar (try eol <|> try comment <|> eof)
   return (key, rstrip value)
