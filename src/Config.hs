@@ -2,6 +2,7 @@
 
 module Config where
 
+import Control.Monad
 import Data.Char
 import Data.Maybe
 import Text.ParserCombinators.Parsec
@@ -41,12 +42,12 @@ identifier = do
 
 -- comment parser
 comment :: Parser ()
-comment = char '#' >> skipMany (noneOf "\n") <?> "comment"
+comment = void (char '#' >> manyTill anyChar eol) <?> "comment"
 
 
 -- end of line parser
 eol :: Parser ()
-eol = oneOf "\n" >> return () <?> "end of line"
+eol = void newline <?> "end of line"
 
 -- single line parser
 item :: Parser (String, String)
@@ -64,20 +65,17 @@ item = do
 line :: Parser (Maybe (String, String))
 line = do
   skipMany space
-  try (comment >> return Nothing) <|> (item >>= return . Just)
+  try (Nothing <$ comment) <|> (Just <$> item)
 
 -- file parser, contains many lines
+-- drops all comments lines
 file :: Parser [(String, String)]
-file = do
-  ls <- many line        -- read all the lines in the file
-  return (catMaybes ls)  -- drop all nothings
+file = fmap catMaybes (many line)
 
 readConfigMap :: SourceName -> IO (Either ParseError StringMap)
 readConfigMap name = do
   result <- parseFromFile file name
-  return (case result of
-           Left err -> Left err  -- reversed to overwrite older entries:
-           Right xs -> Right (Map.fromList (reverse xs)))
+  return (fmap (Map.fromList . reverse) result)
 
 readConfig :: FilePath -> IO Config
 readConfig path =
