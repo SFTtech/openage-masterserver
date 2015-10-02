@@ -75,7 +75,12 @@ file = fmap catMaybes (many line)
 readConfigMap :: SourceName -> IO (Either ParseError StringMap)
 readConfigMap name = do
   result <- parseFromFile file name
-  return (fmap (Map.fromList . reverse) result)
+  return (fmap resultToStringMap result)
+
+-- result is an association list [(String, String)]
+-- if a key appears twice in the list it overwrites the previous result
+-- therefore we have to reverse the list to prefer the first association
+resultToStringMap result = Map.fromList (reverse result)
 
 readConfig :: FilePath -> IO Config
 readConfig path =
