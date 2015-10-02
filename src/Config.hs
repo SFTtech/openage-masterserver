@@ -2,7 +2,7 @@
 
 module Config where
 
-import Control.Monad
+import Control.Monad(void)
 import Data.Char
 import Data.Maybe
 import Text.ParserCombinators.Parsec
@@ -18,7 +18,7 @@ data Config = Config {
   dbPassword :: String
 } deriving (Show)
 
--- convert the string -> string map to our wanted config
+-- convert the string => string map to our wanted config
 createConfig :: StringMap -> Maybe Config
 createConfig m = do
   port <- Map.lookup "port" m
@@ -45,7 +45,7 @@ comment = do
     void (anyCharTill eol)
     <?> "comment"
 
--- any character till an end character
+-- any character till an end parser
 anyCharTill = manyTill anyChar
 
 -- end of line parser
