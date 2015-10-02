@@ -40,7 +40,10 @@ identifier = do
 
 -- comment parser
 comment :: Parser ()
-comment = char '#' >> void (anyCharTill eol) <?> "comment"
+comment = do
+    char '#'
+    void (anyCharTill eol)
+    <?> "comment"
 
 -- any character till an end character
 anyCharTill = manyTill anyChar
@@ -64,8 +67,8 @@ item = do
 -- line parser, is nothing if line is a comment only
 line :: Parser (Maybe (String, String))
 line = do
-  skipMany space
-  try (Nothing <$ comment) <|> (Just <$> item)
+    skipMany space
+    try (Nothing <$ comment) <|> (Just <$> item)
 
 -- file parser, contains many lines
 -- drops all comments lines
@@ -87,11 +90,11 @@ readConfig path =
   do
     cmap <- readConfigMap path
     case cmap of
-     Left err -> error ("config parsing failed: " ++ (show err))
+     Left err -> error ("config parsing failed: " ++ show err)
      Right m  -> do
        let cfg = createConfig m
        case cfg of
         Nothing -> error "config file has missing keys"
         Just c -> do
-          putStrLn ("configuration:\n" ++ (show c))
+          putStrLn ("configuration:\n" ++ show c)
           return c
