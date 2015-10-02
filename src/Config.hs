@@ -9,7 +9,6 @@ import Text.ParserCombinators.Parsec
 
 import qualified Data.Map as Map
 
-
 -- the config file has these entries
 data Config = Config {
   netPort    :: Int,
@@ -29,7 +28,6 @@ createConfig m = do
   dbpass <- Map.lookup "db_password" m
   Just (Config (read port) dbhost dbname dbuser dbpass)
 
-
 type StringMap = Map.Map String String
 
 -- config key parser
@@ -42,8 +40,10 @@ identifier = do
 
 -- comment parser
 comment :: Parser ()
-comment = void (char '#' >> manyTill anyChar eol) <?> "comment"
+comment = char '#' >> void (anyCharTill eol) <?> "comment"
 
+-- any character till an end character
+anyCharTill = manyTill anyChar
 
 -- end of line parser
 eol :: Parser ()
@@ -56,7 +56,7 @@ item = do
   skipMany space
   char '='         -- aand assign a value to that key
   skipMany space
-  value <- manyTill anyChar (try eol <|> try comment <|> eof)
+  value <- anyCharTill (try eol <|> try comment <|> eof)
   return (key, rstrip value)
   where rstrip = reverse . dropWhile isSpace . reverse
 
