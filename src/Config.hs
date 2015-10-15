@@ -2,12 +2,12 @@
 
 module Config where
 
+import Control.Monad(void)
 import Data.Char
 import Data.Maybe
 import Text.ParserCombinators.Parsec
 
 import qualified Data.Map as Map
-
 
 -- the config file has these entries
 data Config = Config {
@@ -18,7 +18,7 @@ data Config = Config {
   dbPassword :: String
 } deriving (Show)
 
--- convert the string -> string map to our wanted config
+-- convert the string => string map to our wanted config
 createConfig :: StringMap -> Maybe Config
 createConfig m = do
   port <- Map.lookup "port" m
@@ -27,7 +27,6 @@ createConfig m = do
   dbuser <- Map.lookup "db_user" m
   dbpass <- Map.lookup "db_password" m
   Just (Config (read port) dbhost dbname dbuser dbpass)
-
 
 type StringMap = Map.Map String String
 
@@ -42,17 +41,16 @@ identifier = do
 -- comment parser
 comment :: Parser ()
 comment = do
-  _ <- char '#'
-  skipMany (noneOf "\n")
-  <?> "comment"
+    _ <- char '#'
+    void (anyCharTill eol)
+    <?> "comment"
 
+-- any character till an end parser
+anyCharTill = manyTill anyChar
 
 -- end of line parser
 eol :: Parser ()
-eol = do
-  _ <- oneOf "\n"
-  return ()
-  <?> "end of line"
+eol = void newline <?> "end of line"
 
 -- single line parser
 item :: Parser (String, String)
@@ -61,7 +59,7 @@ item = do
   skipMany space
   _ <- char '='         -- aand assign a value to that key
   skipMany space
-  value <- manyTill anyChar (try eol <|> try comment <|> eof)
+  value <- anyCharTill (try eol <|> try comment <|> eof)
   return (key, rstrip value)
   where rstrip = reverse . dropWhile isSpace . reverse
 
@@ -69,32 +67,34 @@ item = do
 -- line parser, is nothing if line is a comment only
 line :: Parser (Maybe (String, String))
 line = do
-  skipMany space
-  try (comment >> return Nothing) <|> (item >>= return . Just)
+    skipMany space
+    try (Nothing <$ comment) <|> (Just <$> item)
 
 -- file parser, contains many lines
+-- drops all comments lines
 file :: Parser [(String, String)]
-file = do
-  ls <- many line        -- read all the lines in the file
-  return (catMaybes ls)  -- drop all nothings
+file = fmap catMaybes (many line)
 
 readConfigMap :: SourceName -> IO (Either ParseError StringMap)
 readConfigMap name = do
   result <- parseFromFile file name
-  return (case result of
-           Left err -> Left err  -- reversed to overwrite older entries:
-           Right xs -> Right (Map.fromList (reverse xs)))
+  return (fmap resultToStringMap result)
+
+-- result is an association list [(String, String)]
+-- if a key appears twice in the list it overwrites the previous result
+-- therefore we have to reverse the list to prefer the first association
+resultToStringMap result = Map.fromList (reverse result)
 
 readConfig :: FilePath -> IO Config
 readConfig path =
   do
     cmap <- readConfigMap path
     case cmap of
-     Left err -> error ("config parsing failed: " ++ (show err))
+     Left err -> error ("config parsing failed: " ++ show err)
      Right m  -> do
        let cfg = createConfig m
        case cfg of
         Nothing -> error "config file has missing keys"
         Just c -> do
-          putStrLn ("configuration:\n" ++ (show c))
+          putStrLn ("configuration:\n" ++ show c)
           return c
