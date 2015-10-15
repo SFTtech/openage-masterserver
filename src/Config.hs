@@ -41,7 +41,7 @@ identifier = do
 -- comment parser
 comment :: Parser ()
 comment = do
-    char '#'
+    _ <- char '#'
     void (anyCharTill eol)
     <?> "comment"
 
@@ -57,7 +57,7 @@ item :: Parser (String, String)
 item = do
   key <- identifier     -- config entry key
   skipMany space
-  char '='         -- aand assign a value to that key
+  _ <- char '='         -- aand assign a value to that key
   skipMany space
   value <- anyCharTill (try eol <|> try comment <|> eof)
   return (key, rstrip value)
