@@ -7,6 +7,7 @@ import Control.Monad
 import qualified Data.Aeson as JSON
 import qualified Data.ByteString.Lazy as BS
 import qualified Data.Text as TXT
+import qualified Data.Maybe as MB
 
 import qualified BiMap
 import qualified Version as Ver
@@ -42,7 +43,7 @@ instance JSON.FromJSON VersionMessage where
                               (pure (typelookup peertype) <*> (o JSON..: TXT.pack "peertype")) <*>
                               o JSON..: TXT.pack "protocol"
     where
-      typelookup m s = fromMaybe (error (show s ++ " not a valid peer type"))
+      typelookup m s = MB.fromMaybe (error (show s ++ " not a valid peer type"))
                          (BiMap.biLookupR s m)
   parseJSON _ = mzero
 
