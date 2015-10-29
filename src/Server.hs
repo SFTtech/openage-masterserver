@@ -4,6 +4,7 @@ module Server where
 
 import Control.Concurrent
 import System.IO
+import Control.Monad
 
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.ByteString.Lazy.UTF8 as B8
@@ -51,7 +52,7 @@ versionCheck hdl = do
   putStrLn "sending mine..."
   _ <- BSL.hPut hdl (Proto.pack Proto.serverVersion)
   putStrLn "receiving theirs..."
-  peerversion <- (hGetLine hdl >>= return . B8.fromString) >>=
+  peerversion <- liftM B8.fromString (hGetLine hdl) >>=
                   \ver -> case Proto.unpack ver of
                     Just a -> return a
                     Nothing -> error "no peer version received"
