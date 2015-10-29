@@ -40,4 +40,4 @@ identifier = "openage-masterserver"
 
 -- | Combined version representation
 programVersion :: String
-programVersion = identifier ++ " " ++ (showVersion version)
+programVersion = identifier ++ " " ++ showVersion version

@@ -51,11 +51,10 @@ versionCheck hdl = do
   putStrLn "sending mine..."
   _ <- BSL.hPut hdl (Proto.pack Proto.serverVersion)
   putStrLn "receiving theirs..."
-  peerversion <- ((hGetLine hdl >>= return . B8.fromString) >>=
-                  \ver -> case (Proto.unpack ver) of
+  peerversion <- (hGetLine hdl >>= return . B8.fromString) >>=
+                  \ver -> case Proto.unpack ver of
                     Just a -> return a
                     Nothing -> error "no peer version received"
-                 )
 
   -- versions must match.
   BSL.hPut hdl (Proto.pack (Proto.CompatibilityMessage (compat peerversion)))
@@ -64,4 +63,4 @@ versionCheck hdl = do
   return True
 
   where
-    compat v = (Proto.peerProtocolVersion v) == Proto.version
+    compat v = Proto.peerProtocolVersion v == Proto.version
