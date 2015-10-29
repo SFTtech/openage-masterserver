@@ -76,6 +76,7 @@ instance NetMsg CompatibilityMessage where
 
 
 -- | Communication protocol version.
+-- Valid format is: {"protocol":VERSION,"peertype":PEERTYPE,"peersoftware":STRING}
 version :: Ver.Version
 version = Ver.makeVersion [0, 0]
 
