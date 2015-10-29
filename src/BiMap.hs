@@ -8,7 +8,7 @@ import qualified Data.Map as Map
 data BiMap a b = BiMap (Map.Map a b, Map.Map b a)
 
 bimap :: (Ord a, Eq a, Ord b, Eq b) => [(a, b)] -> BiMap a b
-bimap l = BiMap (Map.fromList l, Map.fromList ([(y, x) | (x, y) <- l]))
+bimap l = BiMap (Map.fromList l, Map.fromList [(y, x) | (x, y) <- l])
 
 biLookupL :: (Ord a, Eq a) => a -> BiMap a b -> Maybe b
 biLookupL k (BiMap (l, _)) = Map.lookup k l

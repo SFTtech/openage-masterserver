@@ -5,7 +5,7 @@ module Util where
 -- | Pick entry `idx` of given list. Return Nothing if out of bounds.
 maybeElem :: Int -> [b] -> Maybe b
 maybeElem idx xs =
-  if idx > (length xs) - 1 then
+  if idx > length xs - 1 then
     Nothing
   else
     Just (xs !! idx)

@@ -34,8 +34,8 @@ runMode opt args =
 
 parseArgs :: [String] -> [OptEntry] -> String -> IO ()
 parseArgs args opts usage =
-  case (Util.maybeElem 0 args) of
-   Just mode -> do
+  case Util.maybeElem 0 args of
+   Just mode ->
      case Map.lookup mode (Map.fromList opts) of
       Just (_, opt) -> runMode opt args
       Nothing       -> faild
@@ -44,7 +44,7 @@ parseArgs args opts usage =
      faild = putStrLn usage >> die
 
 exit :: IO ()
-exit = Exit.exitWith (Exit.ExitSuccess)
+exit = Exit.exitWith Exit.ExitSuccess
 
 die :: IO ()
-die = Exit.exitWith (Exit.ExitFailure 1)
+die = Exit.exitWith $ Exit.ExitFailure 1
