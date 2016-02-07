@@ -1,88 +1,37 @@
--- Copyright 2015-2015 the openage authors. See copying.md for legal info.
-
+{-# LANGUAGE OverloadedStrings, TemplateHaskell #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-|
+ -Copyright 2016-2016 the openage authors.
+ -See copying.md for legal info.
+ -}
 module Protocol where
 
-import Control.Monad
+import Data.Aeson.TH
+import Data.Version
+import Data.Text(Text)
+import Database.Persist.TH
 
-import qualified Data.Aeson as JSON
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.Text as TXT
-import qualified Data.Maybe as MB
+-- | Game Server registration Message
+data GameInit = GameInit {
+  name :: Text,
+  maxPlayers :: Int,
+  state :: GameStat
+  } deriving (Show, Eq)
 
-import qualified BiMap
-import qualified Version as Ver
+-- | Game Status
+data GameStat = Lobby | Running | Aborted | Finished
+  deriving (Show, Read, Eq)
+derivePersistField "GameStat"
 
-
-class NetMsg a where
-  toByteString :: a -> BS.ByteString
-  fromByteString :: BS.ByteString -> Maybe a
-
--- | Protocol negotiation message
+-- | Communication Protocol Version Message
 data VersionMessage = VersionMessage {
-  peerSoftware :: String,
+  peerSoftware :: Text,
   peerType :: PeerType,
-  peerProtocolVersion :: Ver.Version
-  } deriving Show
+  peerProtocolVersion :: Version
+  } deriving (Show, Eq)
 
-instance NetMsg VersionMessage where
-  toByteString = JSON.encode
-  fromByteString = JSON.decode
+-- | Peer Operation Type
+data PeerType = Server | Client | Masterserver
+  deriving (Show, Eq)
 
--- | Peer operation type
-data PeerType = Server | Client | Masterserver deriving (Show, Ord, Eq)
-
-peertype :: BiMap.BiMap PeerType String
-peertype = BiMap.bimap [(Server, "server"),
-                        (Client, "client"),
-                        (Masterserver, "masterserver")]
-
--- | converting version messages from json
-instance JSON.FromJSON VersionMessage where
-  parseJSON (JSON.Object o) = VersionMessage <$>
-                              o JSON..: TXT.pack "peersoftware" <*>
-                              (pure (typelookup peertype) <*> (o JSON..: TXT.pack "peertype")) <*>
-                              o JSON..: TXT.pack "protocol"
-    where
-      typelookup m s = MB.fromMaybe (error (show s ++ " not a valid peer type"))
-                         (BiMap.biLookupR s m)
-  parseJSON _ = mzero
-
-instance JSON.ToJSON VersionMessage where
-  toJSON (VersionMessage sw pt pv) = JSON.object [
-    TXT.pack "peersoftware" JSON..= sw,
-    TXT.pack "peertype" JSON..= BiMap.biLookupL pt peertype,
-    TXT.pack "protocol" JSON..= pv
-    ]
-
-data CompatibilityMessage = CompatibilityMessage {
-  versionCompatible :: Bool
-  } deriving Show
-
-instance JSON.FromJSON CompatibilityMessage where
-  parseJSON (JSON.Object o) = CompatibilityMessage <$>
-                              o JSON..: TXT.pack "compatible"
-  parseJSON _ = mzero
-
-instance JSON.ToJSON CompatibilityMessage where
-  toJSON (CompatibilityMessage c) = JSON.object [
-    TXT.pack "compatible" JSON..= c
-    ]
-
-instance NetMsg CompatibilityMessage where
-  toByteString = JSON.encode
-  fromByteString = JSON.decode
-
-
--- | Communication protocol version.
--- Valid format is: {"protocol":VERSION,"peertype":PEERTYPE,"peersoftware":STRING}
-version :: Ver.Version
-version = Ver.makeVersion [0, 0]
-
-serverVersion :: VersionMessage
-serverVersion = VersionMessage{peerSoftware = Ver.identifier, peerType = Masterserver, peerProtocolVersion = version}
-
-pack :: (NetMsg a) => a -> BS.ByteString
-pack = toByteString
-
-unpack :: (NetMsg a) => BS.ByteString -> Maybe a
-unpack = fromByteString
+concat <$> mapM (deriveJSON defaultOptions) [''GameInit, ''GameStat, ''PeerType, ''VersionMessage, ''Version]

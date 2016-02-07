@@ -1,19 +1,30 @@
--- Copyright 2015-2015 the openage authors. See copying.md for legal info.
-
-
--- | database schema definition
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE GADTs                      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE QuasiQuotes                #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-|
+ -Copyright 2016-2016 the openage authors.
+ -See copying.md for legal info.
+ -}
 module DBSchema where
 
--- | postgresql schema init for the openage master server database
-schema = unlines [
-  "SET client_encoding = 'UTF8';",
+import Database.Persist.TH
+import Data.Text
+import Protocol
 
-  -- table for currently registered gameservers
-  "CREATE TABLE servers (",
-  "  ip inet NOT NULL,",
-  "  port inet NOT NULL,",
-  "  name text NOT NULL,",
-  "  last_alive timestamp NOT NULL,",
-  "  PRIMARY KEY (ip, port)",
-  ");"
-  ]
+share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
+Game
+    name Text
+    maxPlayers Int
+    state GameStat
+    deriving Show
+Player
+    username Text
+    Username username
+    password Text
+    deriving Show
+|]
