@@ -19,22 +19,36 @@ build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
+library
+  hs-source-dirs:      src
+  exposed-modules:     Protocol
+                     , Config
+                     , Database
+                     , DBSchema
+                     , Version
+                     , BiMap
+                     , Args
+                     , Server
+                     , Util
+  build-depends:       base >= 4.7 && < 5
+                     , HDBC
+                     , HDBC-postgresql
+                     , aeson
+                     , bytestring
+                     , containers
+                     , network
+                     , parsec
+                     , utf8-string
+                     , text
+  default-language:    Haskell2010
+
 executable openage-masterserver
   ghc-options:         -O2 -Wall -dynamic -threaded -fno-warn-missing-signatures -fwarn-tabs
-  hs-source-dirs:      src
+  hs-source-dirs:      app
   main-is:             Main.hs
   default-language:    Haskell2010
-  build-depends:
-    base >=4.7,
-    HDBC,
-    HDBC-postgresql,
-    aeson,
-    bytestring,
-    containers,
-    network,
-    parsec,
-    utf8-string,
-    text
+  build-depends:       base >=4.7
+                     , openage-masterserver
 
 source-repository head
   type: git
