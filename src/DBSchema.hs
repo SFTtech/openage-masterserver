@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuasiQuotes                #-}
@@ -12,9 +13,14 @@
  -}
 module DBSchema where
 
+import Database.Persist
+import Database.Persist.Postgresql
 import Database.Persist.TH
 import Data.Text
+import Control.Monad.Logger
+import Control.Monad.IO.Class
 import Protocol
+import Config
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Game
@@ -24,7 +30,24 @@ Game
     deriving Show
 Player
     username Text
-    Username username
+    UniqueUsername username
     password Text
     deriving Show
 |]
+
+addPlayer :: Player -> Bool
+addPlayer = undefined
+
+getPlayer :: Text -> IO(Maybe (Entity Player))
+getPlayer pName = do
+  (con, _)<- loadConf
+  conStr <- loadCfgStr con
+  runPost conStr $ getBy $ UniqueUsername pName
+
+addGame :: Game -> Bool
+addGame = undefined
+
+runPost conStr action = runStderrLoggingT $ withPostgresqlPool conStr 10 $ \pool ->
+  liftIO $ flip runSqlPersistMPool pool $ do
+    runMigration migrateAll
+    action
