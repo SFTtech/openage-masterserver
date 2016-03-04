@@ -12,7 +12,7 @@ import Data.Configurator
 import Data.Configurator.Types
 
 loadConf :: IO (Config, ThreadId)
-loadConf = autoReload autoConfig [Required "masterserver.conf"]
+loadConf = autoReload autoConfig [Required "etc/openage/masterserver.cfg"]
 
 loadCfgStr :: Config -> IO ByteString
 loadCfgStr config = do
