@@ -11,27 +11,30 @@ import Data.Version
 import Data.Text(Text)
 import Database.Persist.TH
 
--- | Game Server registration Message
-data GameInit = GameInit {
-  name :: Text,
-  maxPlayers :: Int,
-  state :: GameStat
-  } deriving (Show, Eq)
-
 -- | Game Status
 data GameStat = Lobby | Running | Aborted | Finished
   deriving (Show, Read, Eq)
 derivePersistField "GameStat"
 
--- | Communication Protocol Version Message
-data VersionMessage = VersionMessage {
+-- | Peer Operation Type
+data PeerType = Server | Client | Masterserver
+  deriving (Show, Read, Eq)
+
+-- | Messages sent by Client
+data ClientMessage =
+  GameInit {
+  name :: Text,
+  maxPlayers :: Int,
+  state :: GameStat
+  } |
+  VersionMessage {
   peerSoftware :: Text,
   peerType :: PeerType,
   peerProtocolVersion :: Version
-  } deriving (Show, Eq)
+  } |
+  LoginMessage {
+  name :: Text,
+  password :: Text
+  } deriving (Show, Read, Eq)
 
--- | Peer Operation Type
-data PeerType = Server | Client | Masterserver
-  deriving (Show, Eq)
-
-concat <$> mapM (deriveJSON defaultOptions) [''GameInit, ''GameStat, ''PeerType, ''VersionMessage, ''Version]
+concat <$> mapM (deriveJSON defaultOptions) [''ClientMessage, ''GameStat, ''PeerType, ''Version]
