@@ -7,6 +7,7 @@
  - to start communicating with each other.
  -}
 module Main where
+import Server
 
 main :: IO ()
-main = undefined
+main = startServer

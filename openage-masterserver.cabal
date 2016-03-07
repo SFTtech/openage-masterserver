@@ -27,6 +27,7 @@ library
                      , Server
   build-depends:       base >= 4.7 && < 5
                      , aeson
+                     , containers >= 0.5
                      , text
                      , bytestring >= 0.10
                      , persistent
@@ -35,6 +36,7 @@ library
                      , transformers >= 0.4
                      , configurator
                      , mtl
+                     , stm >= 2.4
                      , monad-logger >= 0.3
                      , network >= 2.6
                      , scrypt >= 0.5
