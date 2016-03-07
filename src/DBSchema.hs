@@ -19,7 +19,6 @@ import Database.Persist.TH
 import Data.Text
 import Control.Monad.Logger
 import Control.Monad.IO.Class
-import Protocol
 import Config
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
