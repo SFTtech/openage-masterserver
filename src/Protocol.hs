@@ -31,6 +31,7 @@ newClient clientName clientHandle = return Client{..}
 type GameName = Text
 
 data Game = Game {
+  gameHost :: AuthPlayerName,
   gameName:: Text,
   gameMap :: Text,
   numPlayers :: Int,
@@ -42,10 +43,9 @@ data Game = Game {
 data GameStat = Lobby | Running | Aborted | Finished
   deriving (Show, Read, Eq)
 
-newGame :: Text -> Text -> Int -> STM Game
-newGame gameName gameMap numPlayers = return Game {gameState=Lobby,
-                                                   gamePlayers=[],
-                                                   ..}
+newGame :: AuthPlayerName -> Text -> Text -> Int -> STM Game
+newGame gameName gameHost gameMap numPlayers =
+  return Game {gameState=Lobby, gamePlayers=[], ..}
 
 -- | Messages sent by Client
 data ClientMessage =
@@ -61,6 +61,7 @@ data ClientMessage =
   GameJoin {
     gameId :: Text
   } |
+  GameLeave |
   GameQuery |
   PlayerQuery |
   VersionMessage {

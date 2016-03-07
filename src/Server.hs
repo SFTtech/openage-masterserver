@@ -10,6 +10,8 @@ import Database.Persist
 import Data.ByteString.Lazy as BL
 import Data.ByteString as B
 import Data.Aeson
+import Data.Text
+import Data.List as L
 import Data.Map.Strict as Map
 import System.IO as S
 import Control.Concurrent
@@ -43,16 +45,16 @@ getGameList server@Server{..} = atomically $ do
   gameList <- readTVar games
   return $ Map.elems gameList
 
-checkAddGame :: Server -> ClientMessage -> IO (Maybe Game)
-checkAddGame server@Server{..} (GameInit gName gMap gPlay) =
+checkAddGame :: Server->AuthPlayerName->ClientMessage->IO (Maybe Game)
+checkAddGame server@Server{..} pName (GameInit gName gMap gPlay) =
   atomically $ do
     gameMap <- readTVar games
     if Map.member gName gameMap
       then return Nothing
-      else do game <- newGame gName gMap gPlay
+      else do game <- newGame gName pName gMap gPlay
               writeTVar games $ Map.insert gName game gameMap
               return $ Just game
-checkAddGame _ _ = return Nothing
+checkAddGame _ _ _ = return Nothing
 
 startServer :: IO()
 startServer = withSocketsDo $ do
@@ -122,11 +124,14 @@ mainLoop server@Server{..} client@Client{..} = do
       sendGameQueryAnswer clientHandle gameList
       mainLoop server client
     GameInit{..} -> do
-      maybeGame <- checkAddGame server mess
+      maybeGame <- checkAddGame server clientName mess
       case maybeGame of
-        Just _ -> sendMessage clientHandle "Added game."
-        Nothing -> sendError clientHandle "Failed adding game."
-      mainLoop server client
+        Just _ -> do
+          sendMessage clientHandle "Added game."
+          gameLoop server client gameInitName
+        Nothing -> do
+          sendError clientHandle "Failed adding game."
+          mainLoop server client
     GameJoin{..} -> do
       gameLis <- readTVarIO games
       if member gameId gameLis
@@ -134,7 +139,7 @@ mainLoop server@Server{..} client@Client{..} = do
           atomically $ writeTVar games
             $ Map.adjust (joinPlayer clientName) gameId gameLis
           sendMessage clientHandle "Joined Game."
-          mainLoop server client
+          gameLoop server client gameId
         else do
           sendError clientHandle "Game does not exist."
           mainLoop server client
@@ -144,5 +149,37 @@ mainLoop server@Server{..} client@Client{..} = do
                      gameName = gameName,
                      gameMap = gameMap,
                      numPlayers = numPlayers,
-                     gameState = gameState}
-    _ -> sendError clientHandle "Wrong Message Format."
+                     gameState = gameState,
+                     gameHost = gameHost}
+    _ -> do
+      sendError clientHandle "Wrong Message Format."
+      mainLoop server client
+
+gameLoop :: Server -> Client -> Text -> IO ()
+gameLoop server@Server{..} client@Client{..} game= do
+  received <- B.hGetLine clientHandle
+  let Just mess = (decode . BL.fromStrict) received
+  case mess of
+    GameLeave -> do
+      gameLis <- readTVarIO games
+      if clientName == gameHost (gameLis!game)
+        then removeGame server game
+        else atomically $ writeTVar games
+               $ Map.adjust (leavePlayer clientName) game gameLis
+      sendMessage clientHandle "Left Game."
+      mainLoop server client
+        where
+          leavePlayer name Game{..} =
+            Game{gamePlayers = L.delete clientName gamePlayers,
+                 gameName = gameName,
+                 gameMap = gameMap,
+                 numPlayers = numPlayers,
+                 gameState = gameState,
+                 gameHost = gameHost}
+    _ -> do
+      sendError clientHandle "Wrong Message Format."
+      gameLoop server client game
+
+removeGame :: Server -> Text -> IO ()
+removeGame server@Server{..} name = atomically $
+  modifyTVar' games $ Map.delete name
