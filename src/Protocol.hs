@@ -18,10 +18,15 @@ import Control.Concurrent.STM
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Char8 as BC
 
--- | Game Status
-data GameStat = Lobby | Running | Aborted | Finished
-  deriving (Show, Read, Eq)
-derivePersistField "GameStat"
+type AuthPlayerName = Text
+
+data Client = Client {
+  clientName :: AuthPlayerName,
+  clientHandle :: Handle
+  } deriving Show
+
+newClient :: Text -> Handle -> STM Client
+newClient clientName clientHandle = return Client{..}
 
 type GameName = Text
 
@@ -29,16 +34,25 @@ data Game = Game {
   gameName:: Text,
   gameMap :: Text,
   numPlayers :: Int,
+  gamePlayers :: [AuthPlayerName],
   gameState :: GameStat
   } deriving Show
 
+-- | Game Status
+data GameStat = Lobby | Running | Aborted | Finished
+  deriving (Show, Read, Eq)
+
 newGame :: Text -> Text -> Int -> STM Game
-newGame gameName gameMap numPlayers = return Game {gameState=Lobby, ..}
+newGame gameName gameMap numPlayers = return Game {gameState=Lobby,
+                                                   gamePlayers=[],
+                                                   ..}
 
 -- | Messages sent by Client
 data ClientMessage =
-  PlayerQuery |
-  GameQuery |
+  Login {
+    loginName :: Text,
+    loginPassword :: Text
+  } |
   GameInit {
     gameInitName :: Text,
     gameInitMap :: Text,
@@ -46,20 +60,13 @@ data ClientMessage =
   } |
   GameJoin {
     gameId :: Text
+  } |
+  GameQuery |
+  PlayerQuery |
+  VersionMessage {
+    peerProtocolVersion :: Version
   }
   deriving (Show, Read, Eq)
-
-data VersionMessage =
-  VersionMessage {
-    peerSoftware :: Text,
-    peerProtocolVersion :: Version
-  } deriving (Show, Read, Eq)
-
-data LoginMessage =
-  Login {
-    loginName :: Text,
-    loginPassword :: Text
-  } deriving (Show, Read, Eq)
 
 -- | Messages sent by Server
 data ServerMessage =
@@ -69,22 +76,23 @@ data ServerMessage =
   deriving Show
 
 -- | Game Server send Functions
+sendEncoded :: ToJSON a => Handle -> a -> IO()
+sendEncoded handle = BC.hPutStrLn handle . BL.toStrict . encode
+
 sendGameQueryAnswer :: Handle -> [Game] -> IO ()
 sendGameQueryAnswer handle list =
-  (BC.hPutStrLn handle . BL.toStrict . encode) $ GameQueryAnswer list
+  sendEncoded handle $ GameQueryAnswer list
 
 sendMessage :: Handle -> Text -> IO()
 sendMessage handle text =
-  (BC.hPutStrLn handle . BL.toStrict . encode) $ Message text
+  sendEncoded handle $ Message text
 
 sendError :: Handle -> Text -> IO()
 sendError handle text =
-  (BC.hPutStrLn handle . BL.toStrict . encode) $ Protocol.Error text
-
+  sendEncoded handle $ Protocol.Error text
 
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''ClientMessage,
                                              ''Game,
-                                             ''LoginMessage,
                                              ''GameStat,
                                              ''ServerMessage,
                                              ''Version]

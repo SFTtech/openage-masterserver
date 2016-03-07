@@ -9,9 +9,7 @@ module Server where
 import Database.Persist
 import Data.ByteString.Lazy as BL
 import Data.ByteString as B
-import Data.ByteString.Char8 as BC
 import Data.Aeson
-import Data.Text as T
 import Data.Map.Strict as Map
 import System.IO as S
 import Control.Concurrent
@@ -29,12 +27,14 @@ myVersion = Version [1, 0, 0] []
 
 -- | Global server state
 data Server = Server {
-  games :: TVar (Map GameName Game)
+  games :: TVar (Map GameName Game),
+  clients :: TVar (Map AuthPlayerName Client)
   }
 
 newServer :: IO Server
 newServer = do
   games <- newTVarIO Map.empty
+  clients <- newTVarIO Map.empty
   return Server{..}
 
 -- | Server state helper functions
@@ -54,7 +54,6 @@ checkAddGame server@Server{..} (GameInit gName gMap gPlay) =
               return $ Just game
 checkAddGame _ _ = return Nothing
 
-
 startServer :: IO()
 startServer = withSocketsDo $ do
   (conf, _) <- loadConf
@@ -63,24 +62,32 @@ startServer = withSocketsDo $ do
   sock <- listenOn (PortNumber (fromIntegral port))
   printf "Listening on port %d\n" port
   forever $ do
-      (handle, host, port) <- accept sock
-      printf "Accepted connection from %s: %s\n" host (show port)
-      forkFinally (talk handle server) (\_ ->
-                                  printf "Connection from %s closed\n" host >> hClose handle)
+      (handle, host, clientPort) <- accept sock
+      printf "Accepted connection from %s: %s\n" host (show clientPort)
+      forkFinally (talk handle server)
+        (\_ -> printf "Connection from %s closed\n" host >>
+               sendError handle "Unknown Message." >> hClose handle)
 
 talk :: S.Handle -> Server -> IO()
 talk handle server = do
   S.hSetNewlineMode handle universalNewlineMode
   S.hSetBuffering handle LineBuffering
   getVersion handle
-  getLogin handle
-  mainLoop handle server
+  mayClient <- checkAddClient handle
+  case mayClient of
+    Just client -> do
+      sendMessage handle "Login success."
+      mainLoop server client
+    Nothing -> sendError handle "Login failed."
 
 -- | Compare Version to own
 getVersion :: S.Handle -> IO ()
 getVersion handle = do
   verJson <- B.hGetLine handle
-  if (decode . BL.fromStrict) verJson == Just myVersion
+  if (peerProtocolVersion .
+      fromJust .
+      decode .
+      BL.fromStrict) verJson == myVersion
     then
       sendMessage handle "Version accepted."
     else do
@@ -89,38 +96,53 @@ getVersion handle = do
       killThread thread
 
 -- | Get login credentials from handle and checkLogin
-getLogin :: S.Handle -> IO ()
-getLogin handle = do
+checkAddClient :: S.Handle -> IO (Maybe Client)
+checkAddClient handle = do
   loginJson <- B.hGetLine handle
-  correct <- (checkLogin . fromJust . decode . BL.fromStrict) loginJson
-  if correct
-    then
-      sendMessage handle "Login success."
-    else do
-      sendError handle "Login failed."
-      thread <- myThreadId
-      killThread thread
+  let Just loginDecoded = (decode . BL.fromStrict) loginJson
+  checkPassw handle loginDecoded
 
--- | Authenticate Credentials
-checkLogin :: LoginMessage -> IO Bool
-checkLogin login = do
-  Just (Entity _ player) <- getPlayer $ loginName login
-  return $ loginPassword login == playerPassword player
+checkPassw :: Handle -> ClientMessage -> IO(Maybe Client)
+checkPassw handle Login{..} = do
+  Just (Entity _ Player{..}) <- getPlayer loginName
+  if loginPassword == playerPassword
+    then return $ Just Client{clientName=playerUsername,
+                              clientHandle=handle}
+    else return Nothing
+checkPassw _ _ = return Nothing
 
 -- | Main Lobby loop with ClientMessage Handler functions
-mainLoop :: S.Handle -> Server -> IO ()
-mainLoop handle server@Server{..} = do
-  received <- B.hGetLine handle
+mainLoop :: Server -> Client-> IO ()
+mainLoop server@Server{..} client@Client{..} = do
+  received <- B.hGetLine clientHandle
   let Just mess = (decode . BL.fromStrict) received
   case mess of
     GameQuery -> do
       gameList <- getGameList server
-      sendGameQueryAnswer handle gameList
-      mainLoop handle server
+      sendGameQueryAnswer clientHandle gameList
+      mainLoop server client
     GameInit{..} -> do
       maybeGame <- checkAddGame server mess
       case maybeGame of
-        Just game -> sendMessage handle "Added Game."
-        Nothing -> sendError handle "Couldn't add game."
-      mainLoop handle server
-    _ -> sendError handle "Wrong Message Format."
+        Just _ -> sendMessage clientHandle "Added game."
+        Nothing -> sendError clientHandle "Failed adding game."
+      mainLoop server client
+    GameJoin{..} -> do
+      gameLis <- readTVarIO games
+      if member gameId gameLis
+        then  do
+          atomically $ writeTVar games
+            $ Map.adjust (joinPlayer clientName) gameId gameLis
+          sendMessage clientHandle "Joined Game."
+          mainLoop server client
+        else do
+          sendError clientHandle "Game does not exist."
+          mainLoop server client
+            where
+              joinPlayer name Game{..} =
+                Game{gamePlayers = name:gamePlayers,
+                     gameName = gameName,
+                     gameMap = gameMap,
+                     numPlayers = numPlayers,
+                     gameState = gameState}
+    _ -> sendError clientHandle "Wrong Message Format."
