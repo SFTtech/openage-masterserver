@@ -124,17 +124,3 @@ mainLoop handle server@Server{..} = do
         Nothing -> sendError handle "Couldn't add game."
       mainLoop handle server
     _ -> sendError handle "Wrong Message Format."
-
-
--- | Game Server send Functions
-sendGameQueryAnswer :: Handle -> [Game] -> IO ()
-sendGameQueryAnswer handle list =
-  (BC.hPutStrLn handle . BL.toStrict . encode) $ GameQueryAnswer list
-
-sendMessage :: Handle -> Text -> IO()
-sendMessage handle text =
-  (BC.hPutStrLn handle . BL.toStrict . encode) $ Message text
-
-sendError :: Handle -> Text -> IO()
-sendError handle text =
-  (BC.hPutStrLn handle . BL.toStrict . encode) $ Protocol.Error text

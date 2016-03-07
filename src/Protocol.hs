@@ -8,11 +8,15 @@
  -}
 module Protocol where
 
+import Data.Aeson
 import Data.Aeson.TH
 import Data.Version
 import Data.Text(Text)
+import System.IO
 import Database.Persist.TH
 import Control.Concurrent.STM
+import Data.ByteString.Lazy as BL
+import Data.ByteString.Char8 as BC
 
 -- | Game Status
 data GameStat = Lobby | Running | Aborted | Finished
@@ -45,12 +49,6 @@ data ClientMessage =
   }
   deriving (Show, Read, Eq)
 
-data ServerMessage =
-  GameQueryAnswer {gameList :: [Game]} |
-  Error {errorString :: Text} |
-  Message {messageString :: Text}
-  deriving Show
-
 data VersionMessage =
   VersionMessage {
     peerSoftware :: Text,
@@ -63,7 +61,28 @@ data LoginMessage =
     loginPassword :: Text
   } deriving (Show, Read, Eq)
 
-concat <$> mapM (deriveJSON defaultOptions) [''ClientMessage,
+-- | Messages sent by Server
+data ServerMessage =
+  GameQueryAnswer {gameList :: [Game]} |
+  Error {errorString :: Text} |
+  Message {messageString :: Text}
+  deriving Show
+
+-- | Game Server send Functions
+sendGameQueryAnswer :: Handle -> [Game] -> IO ()
+sendGameQueryAnswer handle list =
+  (BC.hPutStrLn handle . BL.toStrict . encode) $ GameQueryAnswer list
+
+sendMessage :: Handle -> Text -> IO()
+sendMessage handle text =
+  (BC.hPutStrLn handle . BL.toStrict . encode) $ Message text
+
+sendError :: Handle -> Text -> IO()
+sendError handle text =
+  (BC.hPutStrLn handle . BL.toStrict . encode) $ Protocol.Error text
+
+
+Prelude.concat <$> mapM (deriveJSON defaultOptions) [''ClientMessage,
                                              ''Game,
                                              ''LoginMessage,
                                              ''GameStat,
