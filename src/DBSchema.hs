@@ -23,11 +23,6 @@ import Protocol
 import Config
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
-Game
-    name Text
-    maxPlayers Int
-    state GameStat
-    deriving Show
 Player
     username Text
     UniqueUsername username
@@ -43,9 +38,6 @@ getPlayer pName = do
   (con, _)<- loadConf
   conStr <- loadCfgStr con
   runPost conStr $ getBy $ UniqueUsername pName
-
-addGame :: Game -> Bool
-addGame = undefined
 
 runPost conStr action = runStderrLoggingT $ withPostgresqlPool conStr 10 $ \pool ->
   liftIO $ flip runSqlPersistMPool pool $ do
