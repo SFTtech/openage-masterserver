@@ -18,18 +18,28 @@ import Control.Concurrent.STM
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Char8 as BC
 
-type AuthPlayerName = Text
-
+-- |Client datatype
+-- It stores players name, handle and a channel to address it.
 data Client = Client {
   clientName :: AuthPlayerName,
-  clientHandle :: Handle
-  } deriving Show
+  clientHandle :: Handle,
+  clientChan :: TChan InMessage
+  }
 
+type AuthPlayerName = Text
+
+-- |Client constructor
 newClient :: Text -> Handle -> STM Client
-newClient clientName clientHandle = return Client{..}
+newClient clientName clientHandle = do
+  clientChan <- newTChan
+  return Client{..}
 
-type GameName = Text
+-- |Sends InMessage to the clients channel
+sendChanMessage :: Client -> InMessage -> STM ()
+sendChanMessage Client{..} = writeTChan clientChan
 
+-- |Game datatype
+-- It stores information about an open game
 data Game = Game {
   gameHost :: AuthPlayerName,
   gameName:: Text,
@@ -38,6 +48,8 @@ data Game = Game {
   gamePlayers :: [AuthPlayerName],
   gameState :: GameStat
   } deriving Show
+
+type GameName = Text
 
 -- | Game Status
 data GameStat = Lobby | Running | Aborted | Finished
@@ -48,7 +60,7 @@ newGame gameName gameHost gameMap numPlayers =
   return Game {gameState=Lobby, gamePlayers=[], ..}
 
 -- | Messages sent by Client
-data ClientMessage =
+data InMessage =
   Login {
     loginName :: Text,
     loginPassword :: Text
@@ -92,7 +104,7 @@ sendError :: Handle -> Text -> IO()
 sendError handle text =
   sendEncoded handle $ Protocol.Error text
 
-Prelude.concat <$> mapM (deriveJSON defaultOptions) [''ClientMessage,
+Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                              ''Game,
                                              ''GameStat,
                                              ''ServerMessage,

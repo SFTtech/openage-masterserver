@@ -45,7 +45,7 @@ getGameList server@Server{..} = atomically $ do
   gameList <- readTVar games
   return $ Map.elems gameList
 
-checkAddGame :: Server->AuthPlayerName->ClientMessage->IO (Maybe Game)
+checkAddGame :: Server -> AuthPlayerName -> InMessage -> IO (Maybe Game)
 checkAddGame server@Server{..} pName (GameInit gName gMap gPlay) =
   atomically $ do
     gameMap <- readTVar games
@@ -75,7 +75,7 @@ talk handle server = do
   S.hSetNewlineMode handle universalNewlineMode
   S.hSetBuffering handle LineBuffering
   getVersion handle
-  mayClient <- checkAddClient handle
+  mayClient <- checkAddClient server handle
   case mayClient of
     Just client -> do
       sendMessage handle "Login success."
@@ -98,20 +98,24 @@ getVersion handle = do
       killThread thread
 
 -- | Get login credentials from handle and checkLogin
-checkAddClient :: S.Handle -> IO (Maybe Client)
-checkAddClient handle = do
+checkAddClient :: Server -> S.Handle -> IO (Maybe Client)
+checkAddClient server handle = do
   loginJson <- B.hGetLine handle
   let Just loginDecoded = (decode . BL.fromStrict) loginJson
-  checkPassw handle loginDecoded
+  checkPassw server handle loginDecoded
 
-checkPassw :: Handle -> ClientMessage -> IO(Maybe Client)
-checkPassw handle Login{..} = do
+checkPassw :: Server -> Handle -> InMessage -> IO(Maybe Client)
+checkPassw Server{..} handle Login{..} = do
   Just (Entity _ Player{..}) <- getPlayer loginName
   if loginPassword == playerPassword
-    then return $ Just Client{clientName=playerUsername,
-                              clientHandle=handle}
+    then atomically $ do
+      clientMap <- readTVar clients
+      client <- newClient playerUsername handle
+      writeTVar clients
+        $ Map.insert playerUsername client clientMap
+      return $ Just client
     else return Nothing
-checkPassw _ _ = return Nothing
+checkPassw _ _ _ = return Nothing
 
 -- | Main Lobby loop with ClientMessage Handler functions
 mainLoop :: Server -> Client-> IO ()
