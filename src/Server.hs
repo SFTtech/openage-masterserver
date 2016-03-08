@@ -11,6 +11,7 @@ import Data.ByteString.Lazy as BL
 import Data.ByteString as B
 import Data.Aeson
 import Data.Text
+import Data.Text.Encoding
 import Data.List as L
 import Data.Map.Strict as Map
 import System.IO as S
@@ -18,6 +19,7 @@ import Control.Concurrent
 import Text.Printf
 import Control.Monad
 import Control.Concurrent.STM
+import Control.Concurrent.Async
 import Data.Version
 import Data.Maybe
 import Network
@@ -117,18 +119,27 @@ checkPassw Server{..} handle Login{..} = do
     else return Nothing
 checkPassw _ _ _ = return Nothing
 
+runClient :: Server -> Client-> IO ()
+runClient server@Server{..} client@Client{..} = do
+  _ <- race (mainLoop server client) internalReceive
+  return ()
+    where
+      internalReceive = forever $ do
+        msg <- B.hGetLine clientHandle
+        let Just mess = (decode . BL.fromStrict) msg
+        atomically $ sendChanMessage client mess
+
 -- | Main Lobby loop with ClientMessage Handler functions
 mainLoop :: Server -> Client-> IO ()
 mainLoop server@Server{..} client@Client{..} = do
-  received <- B.hGetLine clientHandle
-  let Just mess = (decode . BL.fromStrict) received
-  case mess of
+  msg <- atomically $ readTChan clientChan
+  case msg of
     GameQuery -> do
       gameList <- getGameList server
       sendGameQueryAnswer clientHandle gameList
       mainLoop server client
     GameInit{..} -> do
-      maybeGame <- checkAddGame server clientName mess
+      maybeGame <- checkAddGame server clientName msg
       case maybeGame of
         Just _ -> do
           sendMessage clientHandle "Added game."
@@ -161,9 +172,8 @@ mainLoop server@Server{..} client@Client{..} = do
 
 gameLoop :: Server -> Client -> Text -> IO ()
 gameLoop server@Server{..} client@Client{..} game= do
-  received <- B.hGetLine clientHandle
-  let Just mess = (decode . BL.fromStrict) received
-  case mess of
+  msg <- atomically $ readTChan clientChan
+  case msg of
     GameLeave -> do
       gameLis <- readTVarIO games
       if clientName == gameHost (gameLis!game)

@@ -26,6 +26,7 @@ library
                      , DBSchema
                      , Server
   build-depends:       base >= 4.7 && < 5
+                     , async >= 2.1
                      , aeson
                      , containers >= 0.5
                      , text

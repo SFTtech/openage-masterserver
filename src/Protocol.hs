@@ -61,6 +61,9 @@ newGame gameName gameHost gameMap numPlayers =
 
 -- | Messages sent by Client
 data InMessage =
+  Command {
+    comMessage :: Text
+  } |
   Login {
     loginName :: Text,
     loginPassword :: Text
