@@ -61,9 +61,7 @@ newGame gameName gameHost gameMap numPlayers =
 
 -- | Messages sent by Client
 data InMessage =
-  Command {
-    comMessage :: Text
-  } |
+  GameClosedByHost |
   Login {
     loginName :: Text,
     loginPassword :: Text
@@ -106,6 +104,10 @@ sendMessage handle text =
 sendError :: Handle -> Text -> IO()
 sendError handle text =
   sendEncoded handle $ Protocol.Error text
+
+sendCliGameClosed :: Client -> IO ()
+sendCliGameClosed Client{..} =
+  atomically $ writeTChan clientChan GameClosedByHost
 
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                              ''Game,

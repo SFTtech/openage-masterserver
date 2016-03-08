@@ -11,6 +11,7 @@ import Data.ByteString.Lazy as BL
 import Data.ByteString as B
 import Data.Aeson
 import Data.Text
+import Data.List as L
 import Data.Map.Strict as Map
 import System.IO as S
 import Control.Concurrent
@@ -125,7 +126,7 @@ checkPassw _ _ _ = return Nothing
 
 runClient :: Server -> Client-> IO ()
 runClient server@Server{..} client@Client{..} = do
-  _ <- race sockReceive internalReceive
+  _ <- race internalReceive $ mainLoop server client
   return ()
     where
       internalReceive = forever $ do
@@ -133,29 +134,25 @@ runClient server@Server{..} client@Client{..} = do
         case (decode . BL.fromStrict) msg of
           Just mess -> atomically $ sendChanMessage client mess
           Nothing -> sendError clientHandle "Could not read message."
-      sockReceive = join $ atomically $ do
-        msg <- readTChan clientChan
-        return $ do
-          continue <- handleMessage server client msg
-          when continue sockReceive
 
 -- | Main Lobby loop with ClientMessage Handler functions
-handleMessage :: Server -> Client -> InMessage -> IO Bool
-handleMessage server@Server{..} client@Client{..} msg =
+mainLoop :: Server -> Client -> IO ()
+mainLoop server@Server{..} client@Client{..} = do
+  msg <- atomically $ readTChan clientChan
   case msg of
     GameQuery -> do
       gameList <- getGameList server
       sendGameQueryAnswer clientHandle gameList
-      return True
+      mainLoop server client
     GameInit{..} -> do
       maybeGame <- checkAddGame server clientName msg
       case maybeGame of
-        Just _ -> do
+        Just game -> do
           sendMessage clientHandle "Added game."
-          return True
+          gameLoop server client game
         Nothing -> do
           sendError clientHandle "Failed adding game."
-          return True
+          mainLoop server client
     GameJoin{..} -> do
       gameLis <- readTVarIO games
       if member gameId gameLis
@@ -163,10 +160,10 @@ handleMessage server@Server{..} client@Client{..} msg =
           atomically $ writeTVar games
             $ Map.adjust (joinPlayer clientName) gameId gameLis
           sendMessage clientHandle "Joined Game."
-          return True
+          gameLoop server client (gameLis!gameId)
         else do
           sendError clientHandle "Game does not exist."
-          return True
+          mainLoop server client
             where
               joinPlayer name Game{..} =
                 Game{gamePlayers = name:gamePlayers,
@@ -177,29 +174,37 @@ handleMessage server@Server{..} client@Client{..} msg =
                      gameHost = gameHost}
     _ -> do
       sendError clientHandle "Unknown Tag."
-      return True
+      mainLoop server client
 
---gameLoop :: Server -> Client -> Text -> IO ()
---gameLoop server@Server{..} client@Client{..} game= do
---  msg <- atomically $ readTChan clientChan
---  case msg of
---    GameLeave -> do
---      gameLis <- readTVarIO games
---      if clientName == gameHost (gameLis!game)
---        then removeGame server game
---        else atomically $ writeTVar games
---               $ Map.adjust (leavePlayer clientName) game gameLis
---      sendMessage clientHandle "Left Game."
---      mainLoop server client
---        where
---          leavePlayer name Game{..} =
---            Game{gamePlayers = L.delete clientName gamePlayers,
---                 gameName = gameName,
---                 gameMap = gameMap,
---                 numPlayers = numPlayers,
---                 gameState = gameState,
---                 gameHost = gameHost}
---    _ -> do
---      sendError clientHandle "Wrong Message Format."
---      gameLoop server client game
-
+gameLoop :: Server -> Client -> Game -> IO ()
+gameLoop server@Server{..} client@Client{..} game@Game{..}= do
+  msg <- atomically $ readTChan clientChan
+  case msg of
+    GameClosedByHost -> do
+      sendMessage clientHandle "Game was closed by Host."
+      mainLoop server client
+    GameLeave -> do
+      gameLis <- readTVarIO games
+      if clientName == gameHost
+        then do
+          clientLis <- readTVarIO clients
+          mapM_ (sendCliGameClosed . (!) clientLis) gamePlayers
+          removeGame server gameName
+          sendMessage clientHandle "Closed Game."
+          mainLoop server client
+        else do
+          atomically $ writeTVar games
+            $ Map.adjust (leavePlayer clientName) gameName gameLis
+          sendMessage clientHandle "Left Game."
+          mainLoop server client
+        where
+          leavePlayer name Game{..} =
+            Game{gamePlayers = L.delete clientName gamePlayers,
+                 gameName = gameName,
+                 gameMap = gameMap,
+                 numPlayers = numPlayers,
+                 gameState = gameState,
+                 gameHost = gameHost}
+    _ -> do
+      sendError clientHandle "Wrong Message Format."
+      gameLoop server client game
