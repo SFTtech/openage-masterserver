@@ -13,7 +13,6 @@ import Data.Aeson.TH
 import Data.Version
 import Data.Text(Text)
 import System.IO
-import Database.Persist.TH
 import Control.Concurrent.STM
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Char8 as BC
@@ -23,7 +22,8 @@ import Data.ByteString.Char8 as BC
 data Client = Client {
   clientName :: AuthPlayerName,
   clientHandle :: Handle,
-  clientChan :: TChan InMessage
+  clientChan :: TChan InMessage,
+  clientInGame :: Maybe Text
   }
 
 type AuthPlayerName = Text
@@ -32,7 +32,7 @@ type AuthPlayerName = Text
 newClient :: Text -> Handle -> STM Client
 newClient clientName clientHandle = do
   clientChan <- newTChan
-  return Client{..}
+  return Client{clientOpenGame=Nothing,..}
 
 -- |Sends InMessage to the clients channel
 sendChanMessage :: Client -> InMessage -> STM ()
@@ -83,7 +83,7 @@ data InMessage =
   deriving (Show, Read, Eq)
 
 -- | Messages sent by Server
-data ServerMessage =
+data OutMessage =
   GameQueryAnswer {gameList :: [Game]} |
   Error {errorString :: Text} |
   Message {messageString :: Text}
@@ -112,5 +112,5 @@ sendCliGameClosed Client{..} =
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                              ''Game,
                                              ''GameStat,
-                                             ''ServerMessage,
+                                             ''OutMessage,
                                              ''Version]
