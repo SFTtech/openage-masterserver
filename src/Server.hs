@@ -84,11 +84,26 @@ talk handle server = do
   getVersion handle
   mayClient <- checkAddClient server handle
   case mayClient of
-    Just client -> do
+    Just client@Client{..} -> do
       sendMessage handle "Login success."
-      runClient server client
-    Nothing -> do
+      runClient server client `finally` removeClient server clientName
+    Nothing ->
       sendError handle "Login failed."
+
+removeClient :: Server -> Text -> IO ()
+removeClient server@Server{..} clientName = do
+  clientLis <- readTVarIO clients
+  let client = clientLis!clientName
+  printf "Debug: Client: %s\n" $ show client
+  case clientInGame client of
+    Just game -> do
+      leaveGame server client game
+      cleanTvar
+    Nothing ->
+      cleanTvar
+  where
+    cleanTvar = atomically $
+      modifyTVar' clients $ Map.delete clientName
 
 -- | Compare Version to own
 getVersion :: S.Handle -> IO ()
@@ -147,16 +162,24 @@ mainLoop server@Server{..} client@Client{..} = do
     GameInit{..} -> do
       maybeGame <- checkAddGame server clientName msg
       case maybeGame of
-        Just _ -> do
+        Just Game{..} -> do
+          clientLis <- readTVarIO clients
+          atomically $ writeTVar clients
+            $ Map.adjust (addClientGame gameName) clientName clientLis
           sendMessage clientHandle "Added game."
           gameLoop server client gameInitName
         Nothing -> do
           sendError clientHandle "Failed adding game."
           mainLoop server client
+        where addClientGame game client@Client{..} =
+                client {clientInGame = Just game}
     GameJoin{..} -> do
       gameLis <- readTVarIO games
       if member gameId gameLis
         then  do
+          clientLis <- readTVarIO clients
+          atomically $ writeTVar clients
+            $ Map.adjust (addClientGame gameId) clientName clientLis
           atomically $ writeTVar games
             $ Map.adjust (joinPlayer clientName) gameId gameLis
           sendMessage clientHandle "Joined Game."
@@ -166,7 +189,9 @@ mainLoop server@Server{..} client@Client{..} = do
           mainLoop server client
             where
               joinPlayer name game@Game{..} =
-                game{gamePlayers = name:gamePlayers}
+                game {gamePlayers = name:gamePlayers}
+              addClientGame game client@Client{..} =
+                client {clientInGame = Just game}
     _ -> do
       sendError clientHandle "Unknown Message."
       mainLoop server client
@@ -179,6 +204,14 @@ gameLoop server@Server{..} client@Client{..} game= do
       sendMessage clientHandle "Game was closed by Host."
       mainLoop server client
     GameLeave -> do
+      leaveGame server client game
+      mainLoop server client
+    _ -> do
+      sendError clientHandle "Unknown Message."
+      gameLoop server client game
+
+leaveGame :: Server -> Client -> Text -> IO()
+leaveGame server@Server{..} client@Client{..} game = do
       gameLis <- readTVarIO games
       if clientName == gameHost (gameLis!game)
         then do
@@ -187,15 +220,15 @@ gameLoop server@Server{..} client@Client{..} game= do
             $ gamePlayers $ gameLis!game
           removeGame server game
           sendMessage clientHandle "Closed Game."
-          mainLoop server client
         else do
+          clientLis <- readTVarIO clients
+          atomically $ writeTVar clients
+            $ Map.adjust rmClientGame clientName clientLis
           atomically $ writeTVar games
             $ Map.adjust leavePlayer game gameLis
           sendMessage clientHandle "Left Game."
-          mainLoop server client
             where
               leavePlayer gameOld@Game{..} =
                 gameOld {gamePlayers = L.delete clientName gamePlayers}
-    _ -> do
-      sendError clientHandle "Unknown Message."
-      gameLoop server client game
+              rmClientGame client@Client{..}=
+                client {clientInGame = Nothing}

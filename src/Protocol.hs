@@ -26,13 +26,16 @@ data Client = Client {
   clientInGame :: Maybe Text
   }
 
+instance Show Client where
+  show Client{..} = show clientName ++ show clientInGame
+
 type AuthPlayerName = Text
 
 -- |Client constructor
 newClient :: Text -> Handle -> STM Client
 newClient clientName clientHandle = do
   clientChan <- newTChan
-  return Client{clientOpenGame=Nothing,..}
+  return Client{clientInGame=Nothing,..}
 
 -- |Sends InMessage to the clients channel
 sendChanMessage :: Client -> InMessage -> STM ()
