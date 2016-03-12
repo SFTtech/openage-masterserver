@@ -64,6 +64,7 @@ newGame gameName gameHost gameMap numPlayers =
 
 -- | Messages sent by Client
 data InMessage =
+  GameStartedByHost |
   GameClosedByHost |
   Login {
     loginName :: Text,
@@ -79,15 +80,22 @@ data InMessage =
   } |
   GameLeave |
   GameQuery |
+  GameStart |
+  GameInfo |
+  GameResultMessage {result :: GameResult} |
   PlayerQuery |
   VersionMessage {
     peerProtocolVersion :: Version
   }
   deriving (Show, Read, Eq)
 
+data GameResult = Victory | Defeat
+  deriving (Show, Read, Eq)
+
 -- | Messages sent by Server
 data OutMessage =
   GameQueryAnswer {gameList :: [Game]} |
+  GameInfoAnswer {game :: Game} |
   Error {errorString :: Text} |
   Message {messageString :: Text}
   deriving Show
@@ -108,6 +116,10 @@ sendError :: Handle -> Text -> IO()
 sendError handle text =
   sendEncoded handle $ Protocol.Error text
 
+sendCliGameStart :: Client -> IO ()
+sendCliGameStart Client{..} =
+  atomically $ writeTChan clientChan GameStartedByHost
+
 sendCliGameClosed :: Client -> IO ()
 sendCliGameClosed Client{..} =
   atomically $ writeTChan clientChan GameClosedByHost
@@ -115,5 +127,6 @@ sendCliGameClosed Client{..} =
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                              ''Game,
                                              ''GameStat,
+                                             ''GameResult,
                                              ''OutMessage,
                                              ''Version]

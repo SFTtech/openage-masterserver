@@ -186,6 +186,21 @@ gameLoop :: Server -> Client -> Text -> IO ()
 gameLoop server@Server{..} client@Client{..} game= do
   msg <- atomically $ readTChan clientChan
   case msg of
+    GameStart -> do
+      clientLis <- readTVarIO clients
+      gameLis <- readTVarIO games
+      if clientName == gameHost (gameLis!game)
+        then do
+          mapM_ (sendCliGameStart . (!) clientLis)
+            $ gamePlayers $ gameLis!game
+          mainLoop server client
+        else do
+          sendError clientHandle "Only the host can start the game."
+          gameLoop server client game
+    GameInfo -> do
+      gameLis <- readTVarIO games
+      sendEncoded clientHandle $ GameInfoAnswer (gameLis!game)
+      gameLoop server client game
     GameClosedByHost -> do
       sendMessage clientHandle "Game was closed by Host."
       mainLoop server client
