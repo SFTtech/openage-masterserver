@@ -53,6 +53,7 @@ handleAnswer handle = do
   case (decode . BL.fromStrict) logAns of
     Just P.Message{..} -> printf "Message: %s\n" messageString
     Just P.Error{..} -> printf "Error: %s\n" errorString
+    Just P.GameInfoAnswer{..} -> printFormattedGame game
     Just GameQueryAnswer{..} -> printFormattedGames gameList
     _ -> printf "Error: Decoding error.\n"
 
@@ -63,10 +64,14 @@ mainLoop handle = do
 
 handleLobbyInput :: Handle -> IO ()
 handleLobbyInput handle = do
-  T.putStr "?> "
-  hFlush stdout
   input <- T.getLine
   case Te.words input of
+    ["gameJoin", name] -> do
+      sendEncoded handle $ GameJoin name
+      handleLobbyInput handle
+    ["gameInfo"] -> do
+      sendEncoded handle GameInfo
+      handleLobbyInput handle
     ["gameInit", name, gameMap, players] -> do
       sendGameInit handle name gameMap $ read $ Te.unpack players
       handleLobbyInput handle
@@ -76,10 +81,16 @@ handleLobbyInput handle = do
     ["gameLeave"] -> do
       sendEncoded handle GameLeave
       handleLobbyInput handle
+    ["gameStart"] -> do
+      sendEncoded handle GameStart
+      handleLobbyInput handle
     ["exit"] ->
       printf "exiting testclient...\n"
     ["help"] -> do
       printCommands
+      handleLobbyInput handle
+    com:_ -> do
+      printf "%s: not found.\n" com
       handleLobbyInput handle
     _ ->
       handleLobbyInput handle
@@ -92,9 +103,17 @@ printCommands = do
   printf "\tgameLeave - leave Game, close if Host \n"
   printf "\texit - Close testclient \n"
 
+printFormattedGame :: Game -> IO ()
+printFormattedGame Game{..} = do
+  printf "Name: \t%s\n" gameName
+  printf "Map: \t%s\n" gameMap
+  printf "Players: \n"
+  printf "\t%s\n" gameHost
+  mapM_ (printf "\t%s\n") gamePlayers
+
 printFormattedGames :: [Game] -> IO ()
 printFormattedGames games = do
-  printf "Title\tMap\tPlayers\tHost\n"
+  T.putStr "Title\tMap\tPlayers\tHost\n"
   mapM_ printGame games
     where
       printGame game@Game{..} =
