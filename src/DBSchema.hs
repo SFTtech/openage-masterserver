@@ -29,8 +29,6 @@ Player
     deriving Show
 |]
 
-addPlayer :: Player -> Bool
-addPlayer = undefined
 
 getPlayer :: Text -> IO(Maybe (Entity Player))
 getPlayer pName = do
@@ -38,7 +36,7 @@ getPlayer pName = do
   conStr <- loadCfgStr con
   runPost conStr $ getBy $ UniqueUsername pName
 
-runPost conStr action = runStderrLoggingT $ withPostgresqlPool conStr 10 $ \pool ->
-  liftIO $ flip runSqlPersistMPool pool $ do
+runPost conStr action = runNoLoggingT $ withPostgresqlPool conStr 10
+  $ \pool -> liftIO $ flip runSqlPersistMPool pool $ do
     runMigration migrateAll
     action
