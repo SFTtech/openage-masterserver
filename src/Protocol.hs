@@ -8,6 +8,7 @@
  -}
 module Protocol where
 
+import Data.Map.Strict as Map
 import Data.Aeson
 import Data.Aeson.TH
 import Data.Version
@@ -32,7 +33,7 @@ instance Show Client where
 type AuthPlayerName = Text
 
 -- |Client constructor
-newClient :: Text -> Handle -> STM Client
+newClient :: AuthPlayerName -> Handle -> STM Client
 newClient clientName clientHandle = do
   clientChan <- newTChan
   return Client{clientInGame=Nothing,..}
@@ -45,10 +46,10 @@ sendChanMessage Client{..} = writeTChan clientChan
 -- It stores information about an open game
 data Game = Game {
   gameHost :: AuthPlayerName,
-  gameName:: Text,
+  gameName:: GameName,
   gameMap :: Text,
   numPlayers :: Int,
-  gamePlayers :: [AuthPlayerName],
+  gamePlayers :: Map AuthPlayerName Participant,
   gameState :: GameStat
   } deriving Show
 
@@ -58,36 +59,51 @@ type GameName = Text
 data GameStat = Lobby | Running | Aborted | Finished
   deriving (Show, Read, Eq)
 
-newGame :: AuthPlayerName -> Text -> Text -> Int -> STM Game
+newGame :: GameName -> AuthPlayerName -> Text -> Int -> STM Game
 newGame gameName gameHost gameMap numPlayers =
-  return Game {gameState=Lobby, gamePlayers=[], ..}
+  return Game {gameState=Lobby, gamePlayers=Map.empty, ..}
+
+data Participant = Participant {
+  parName :: AuthPlayerName,
+  parCiv :: Text,
+  parTeam :: Int,
+  parReady :: Bool
+  } deriving Show
+
+newParticipant :: AuthPlayerName -> Bool -> Participant
+newParticipant parName parReady = Participant{parCiv="Britain",
+                                              parTeam=0, ..}
 
 -- | Messages sent by Client
 data InMessage =
-  GameStartedByHost |
-  GameClosedByHost |
+  Broadcast {msg :: Text} |
   Login {
-    loginName :: Text,
+    loginName :: AuthPlayerName,
     loginPassword :: Text
   } |
+  GameClosedByHost |
+  GameInfo |
   GameInit {
-    gameInitName :: Text,
+    gameInitName :: GameName,
     gameInitMap :: Text,
     maxPlayers :: Int
   } |
   GameJoin {
-    gameId :: Text
+    gameId :: GameName
   } |
   GameLeave |
   GameQuery |
-  GameStart |
-  GameInfo |
   GameResultMessage {result :: GameResult} |
-  PlayerQuery |
+  GameStart |
+  GameStartedByHost |
+  PlayerConfig {
+    playerCiv :: Text,
+    playerTeam :: Int,
+    playerReady :: Bool
+  } |
   VersionMessage {
     peerProtocolVersion :: Version
-  }
-  deriving (Show, Read, Eq)
+  } deriving (Show, Read, Eq)
 
 data GameResult = Victory | Defeat
   deriving (Show, Read, Eq)
@@ -116,17 +132,14 @@ sendError :: Handle -> Text -> IO()
 sendError handle text =
   sendEncoded handle $ Protocol.Error text
 
-sendCliGameStart :: Client -> IO ()
-sendCliGameStart Client{..} =
-  atomically $ writeTChan clientChan GameStartedByHost
-
-sendCliGameClosed :: Client -> IO ()
-sendCliGameClosed Client{..} =
-  atomically $ writeTChan clientChan GameClosedByHost
+sendChannel :: Client -> InMessage -> IO ()
+sendChannel Client{..} msg =
+  atomically $ writeTChan clientChan msg
 
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
-                                             ''Game,
-                                             ''GameStat,
-                                             ''GameResult,
-                                             ''OutMessage,
-                                             ''Version]
+                                                     ''Participant,
+                                                     ''Game,
+                                                     ''GameStat,
+                                                     ''GameResult,
+                                                     ''OutMessage,
+                                                     ''Version]

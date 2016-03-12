@@ -11,7 +11,7 @@ import Data.Aeson
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Char8 as B
 import System.IO
-import Data.Text as Te
+import Data.Text as TE
 import Data.Text.IO as T
 import Network
 import Protocol as P
@@ -53,7 +53,7 @@ handleAnswer handle = do
   case (decode . BL.fromStrict) logAns of
     Just P.Message{..} -> printf "Message: %s\n" messageString
     Just P.Error{..} -> printf "Error: %s\n" errorString
-    Just P.GameInfoAnswer{..} -> printFormattedGame game
+    Just GameInfoAnswer{..} -> printFormattedGame game
     Just GameQueryAnswer{..} -> printFormattedGames gameList
     _ -> printf "Error: Decoding error.\n"
 
@@ -65,7 +65,17 @@ mainLoop handle = do
 handleLobbyInput :: Handle -> IO ()
 handleLobbyInput handle = do
   input <- T.getLine
-  case Te.words input of
+  case TE.words input of
+    ["playerConfig", civ, team, rdy] -> do
+      sendEncoded handle (PlayerConfig civ ((read . TE.unpack) team)
+                          ((read . TE.unpack) rdy))
+      handleLobbyInput handle
+    ["gameVictory"] -> do
+      sendEncoded handle (GameResultMessage Victory)
+      handleLobbyInput handle
+    ["gameDefeat"] -> do
+      sendEncoded handle (GameResultMessage Defeat)
+      handleLobbyInput handle
     ["gameJoin", name] -> do
       sendEncoded handle $ GameJoin name
       handleLobbyInput handle
@@ -73,7 +83,7 @@ handleLobbyInput handle = do
       sendEncoded handle GameInfo
       handleLobbyInput handle
     ["gameInit", name, gameMap, players] -> do
-      sendGameInit handle name gameMap $ read $ Te.unpack players
+      sendGameInit handle name gameMap $ (read. TE.unpack) players
       handleLobbyInput handle
     ["gameQuery"] -> do
       sendGameQuery handle
@@ -98,35 +108,40 @@ handleLobbyInput handle = do
 printCommands :: IO ()
 printCommands = do
   printf "Available Commands: \n"
-  printf "\tgameInit \"name\" \"map\" \"numberPlayers\" - Add new Game \n"
+  printf "\tgameInit NAME MAP NUMBERPLAYERS - Add new Game \n"
   printf "\tgameQuery - Show existing games\n"
   printf "\tgameLeave - leave Game, close if Host \n"
   printf "\texit - Close testclient \n"
 
 printFormattedGame :: Game -> IO ()
 printFormattedGame Game{..} = do
-  printf "Name: \t%s\n" gameName
-  printf "Map: \t%s\n" gameMap
-  printf "Players: \n"
-  printf "\t%s\n" gameHost
-  mapM_ (printf "\t%s\n") gamePlayers
+  printf "Name: %s\n" gameName
+  printf "Map: %s\n" gameMap
+  printf "MaxPlayers: %d\n" numPlayers
+  printf "Gamehost: %s\n" gameHost
+  printf "Team:\tName:\tCivilization:\tReady:\n"
+  mapM_ printFormattedPart gamePlayers
+
+printFormattedPart :: Participant -> IO ()
+printFormattedPart Participant{..} =
+  printf "%d\t%s\t%s\t\t%s\n" parTeam parName parCiv $ show parReady
 
 printFormattedGames :: [Game] -> IO ()
 printFormattedGames games = do
   T.putStr "Title\tMap\tPlayers\tHost\n"
   mapM_ printGame games
     where
-      printGame game@Game{..} =
+      printGame Game{..} =
         printf "%s\t%s\t%d\t%s\n" gameName gameMap numPlayers gameHost
 
 sendGameQuery :: Handle -> IO ()
 sendGameQuery handle =
   sendEncoded handle GameQuery
 
-sendGameInit :: Handle -> Text -> Text -> Int -> IO ()
+sendGameInit :: Handle -> GameName -> Text -> Int -> IO ()
 sendGameInit handle name gameMap players =
   sendEncoded handle $ GameInit name gameMap players
 
-sendLogin :: Text -> Text -> Handle -> IO ()
+sendLogin :: AuthPlayerName -> Text -> Handle -> IO ()
 sendLogin name pass handle =
   sendEncoded handle $ Login name pass
