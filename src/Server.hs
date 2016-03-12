@@ -41,7 +41,7 @@ newServer = do
   clients <- newTVarIO Map.empty
   return Server{..}
 
--- |Server state helper functions
+-- |Get List of Games in servers game map
 getGameList :: Server -> IO [Game]
 getGameList Server{..} = atomically $ do
   gameList <- readTVar games
@@ -174,24 +174,10 @@ mainLoop server@Server{..} client@Client{..} = do
         where addClientGame game client@Client{..} =
                 client {clientInGame = Just game}
     GameJoin{..} -> do
-      gameLis <- readTVarIO games
-      if member gameId gameLis
-        then  do
-          clientLis <- readTVarIO clients
-          atomically $ writeTVar clients
-            $ Map.adjust (addClientGame gameId) clientName clientLis
-          atomically $ writeTVar games
-            $ Map.adjust (joinPlayer clientName) gameId gameLis
-          sendMessage clientHandle "Joined Game."
-          gameLoop server client gameId
-        else do
-          sendError clientHandle "Game does not exist."
-          mainLoop server client
-            where
-              joinPlayer name game@Game{..} =
-                game {gamePlayers = name:gamePlayers}
-              addClientGame game client@Client{..} =
-                client {clientInGame = Just game}
+      success <- joinGame server client gameId
+      if success
+        then gameLoop server client gameId
+        else mainLoop server client
     _ -> do
       sendError clientHandle "Unknown Message."
       mainLoop server client
@@ -210,6 +196,30 @@ gameLoop server@Server{..} client@Client{..} game= do
       sendError clientHandle "Unknown Message."
       gameLoop server client game
 
+
+-- |Join Game and return True if join was successful
+joinGame :: Server -> Client -> Text -> IO Bool
+joinGame server@Server{..} client@Client{..} gameId = do
+  gameLis <- readTVarIO games
+  if member gameId gameLis
+    then  do
+      clientLis <- readTVarIO clients
+      atomically $ writeTVar clients
+        $ Map.adjust (addClientGame gameId) clientName clientLis
+      atomically $ writeTVar games
+        $ Map.adjust (joinPlayer clientName) gameId gameLis
+      sendMessage clientHandle "Joined Game."
+      return True
+    else do
+      sendError clientHandle "Game does not exist."
+      return False
+        where
+          joinPlayer name game@Game{..} =
+            game {gamePlayers = name:gamePlayers}
+          addClientGame game client@Client{..} =
+            client {clientInGame = Just game}
+
+-- |Leave Game if normal player, close if host
 leaveGame :: Server -> Client -> Text -> IO()
 leaveGame server@Server{..} client@Client{..} game = do
       gameLis <- readTVarIO games
