@@ -32,7 +32,7 @@ The openage masterserver uses the haskell tool stack to build and
 install.
 Executables can be built using `stack build`.
 
-The server can be started by running `stack exec openage-masterserver`
+The server can be started by running `stack exec openage-masterserver`.
 The port it is listening on and the database login credentials are
 specified in the config file /etc/openage/masterserver.cfg.
 
