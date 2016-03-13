@@ -50,6 +50,7 @@ executable openage-masterserver
   build-depends:       base >=4.7
                      , aeson
                      , async >= 2.1
+                     , bcrypt
                      , bytestring >= 0.10
                      , containers >= 0.5
                      , network >= 2.6

@@ -1,5 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+-- |Copyright 2016-2016 the openage authors.
+-- See copying.md for legal info.
+--
+-- Main entry file for a test-client
+-- this client takes a host and a port as argument
+-- and can send Messages defined in Protocol to the server
 module Main where
 
 import Control.Monad
@@ -21,12 +27,14 @@ import Protocol as P
 main :: IO ()
 main = withSocketsDo $ do
   args <- getArgs
+  printInit
   case args of
     [host, port] -> do
       handle <- connectTo host $ PortNumber
         $ fromIntegral (read port :: Int)
+      hSetBuffering handle NoBuffering
       handleVersion handle
-      getCredentials handle
+      getSendCredentials handle
       mainLoop handle
     _ -> do
       T.putStrLn "Please provide host and port"
@@ -39,15 +47,23 @@ handleVersion handle = do
   sendEncoded handle $ VersionMessage myVer
   handleAnswer handle
 
-getCredentials :: Handle -> IO ()
-getCredentials handle = do
-  printf "Enter Login Credentials:\n"
-  printf "Name: \n"
-  name <- T.getLine
-  printf "Password: \n"
-  pass <- T.getLine
-  sendLogin name pass handle
-  handleAnswer handle
+getSendCredentials :: Handle -> IO ()
+getSendCredentials handle = do
+  input <- T.getLine
+  case TE.words input of
+    ["addplayer",name,pass] -> do
+      sendEncoded handle $ AddPlayer name pass
+      handleAnswer handle
+      getSendCredentials handle
+    ["login" ,name ,pass] -> do
+      sendLogin handle name pass
+      handleAnswer handle
+    ["help"] -> do
+      printCommands
+      getSendCredentials handle
+    _ -> do
+      printf "Command not found.\n"
+      getSendCredentials handle
 
 handleAnswer :: Handle -> IO ()
 handleAnswer handle = do
@@ -57,7 +73,7 @@ handleAnswer handle = do
     Just P.Error{..} -> printf "Error: %s\n" errorString
     Just GameInfoAnswer{..} -> printFormattedGame game
     Just GameQueryAnswer{..} -> printFormattedGames gameList
-    _ -> printf "Error: Decoding error.\n"
+    _ -> T.putStrLn "Error: Decoding error."
 
 mainLoop :: Handle -> IO ()
 mainLoop handle = do
@@ -68,32 +84,29 @@ handleLobbyInput :: Handle -> IO ()
 handleLobbyInput handle = do
   input <- T.getLine
   case TE.words input of
-    ["playerConfig", civ, team, rdy] -> do
+    ["playerconfig", civ, team, rdy] -> do
       sendEncoded handle (PlayerConfig civ ((read . TE.unpack) team)
                           ((read . TE.unpack) rdy))
       handleLobbyInput handle
-    ["gameVictory"] -> do
+    ["result"] -> do
       sendEncoded handle (GameResultMessage Victory)
       handleLobbyInput handle
-    ["gameDefeat"] -> do
-      sendEncoded handle (GameResultMessage Defeat)
-      handleLobbyInput handle
-    ["gameJoin", name] -> do
+    ["join", name] -> do
       sendEncoded handle $ GameJoin name
       handleLobbyInput handle
-    ["gameInfo"] -> do
+    ["info"] -> do
       sendEncoded handle GameInfo
       handleLobbyInput handle
-    ["gameInit", name, gameMap, players] -> do
+    ["init", name, gameMap, players] -> do
       sendGameInit handle name gameMap $ (read. TE.unpack) players
       handleLobbyInput handle
-    ["gameQuery"] -> do
+    ["query"] -> do
       sendGameQuery handle
       handleLobbyInput handle
-    ["gameLeave"] -> do
+    ["leave"] -> do
       sendEncoded handle GameLeave
       handleLobbyInput handle
-    ["gameStart"] -> do
+    ["start"] -> do
       sendEncoded handle GameStart
       handleLobbyInput handle
     ["exit"] ->
@@ -101,18 +114,38 @@ handleLobbyInput handle = do
     ["help"] -> do
       printCommands
       handleLobbyInput handle
-    com:_ -> do
-      printf "%s: not found.\n" com
+    _ -> do
+      printf "Command not found.\n"
       handleLobbyInput handle
-    _ ->
-      handleLobbyInput handle
+
+printInit :: IO ()
+printInit = do
+  T.putStrLn "---------------------------------------------------------"
+  T.putStrLn "- openage masterserver Testclient"
+  T.putStrLn "- Type \"help\" for more information and \"exit\" to exit the client"
+  T.putStrLn "---------------------------------------------------------"
 
 printCommands :: IO ()
 printCommands = do
   printf "Available Commands: \n"
-  printf "\tgameInit NAME MAP NUMBERPLAYERS - Add new Game \n"
-  printf "\tgameQuery - Show existing games\n"
-  printf "\tgameLeave - leave Game, close if Host \n"
+  printf "Login:\n"
+  printf "\taddplayer NAME PASS - add player to server\n"
+  printf "\tlogin NAME PASS - Login to server\n"
+  printf "Lobby:\n"
+  printf "\tquery - Show existing games\n"
+  printf "\tinit NAME MAP NUMBERPLAYERS - Add new Game \n"
+  printf "\tjoin NAME - join Gamelobby \n"
+  printf "Gamelobby:\n"
+  printf "\tinfo - show info about current game \n"
+  printf "\tleave - leave Game, close if Host \n"
+  printf "\tstart - start the game. Only the host can start the\
+         \ game. All Players need to be ready. \n"
+  printf "\tplayerConfig Text:CIV Int:TEAM Bool:READY-\
+         \ change Players settings.\n"
+  printf "Ingame:\n"
+  printf "\tleave - leave Game, close if Host \n"
+  printf "\tresult - send gameresult, terminates game.\n"
+  printf "General:\n"
   printf "\texit - Close testclient \n"
 
 printFormattedGame :: Game -> IO ()
@@ -144,6 +177,6 @@ sendGameInit :: Handle -> GameName -> Text -> Int -> IO ()
 sendGameInit handle name gameMap players =
   sendEncoded handle $ GameInit name gameMap players
 
-sendLogin :: AuthPlayerName -> Text -> Handle -> IO ()
-sendLogin name pass handle =
+sendLogin :: Handle -> AuthPlayerName -> Text -> IO ()
+sendLogin handle name pass =
   sendEncoded handle $ Login name pass

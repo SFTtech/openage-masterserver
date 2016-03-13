@@ -6,19 +6,14 @@
  -}
 module Server where
 
-import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
 import Data.Aeson
 import Data.Text
-import Data.List as L
 import Data.Map.Strict as Map
 import System.IO as S
 import Control.Concurrent.STM
-import Data.Version
-import Network
 import Protocol
-import DBSchema
 
 -- |Server Datatype
 -- Stores Map of running Games and Map of logged in clients
@@ -95,29 +90,6 @@ removeGame :: Server -> GameName -> IO ()
 removeGame Server{..} name = atomically $
   modifyTVar' games $ Map.delete name
 
--- |Join Game and return True if join was successful
-joinGame :: Server -> Client -> GameName -> IO Bool
-joinGame server@Server{..} client@Client{..} gameId = do
-  gameLis <- readTVarIO games
-  if member gameId gameLis
-    then do
-      let Game{..} = gameLis!gameId
-      if Map.size gamePlayers < numPlayers
-        then do
-          clientLis <- readTVarIO clients
-          atomically $ writeTVar clients
-            $ Map.adjust (addClientGame gameId) clientName clientLis
-          atomically $ writeTVar games
-            $ Map.adjust (joinPlayer clientName False) gameId gameLis
-          sendMessage clientHandle "Joined Game."
-          return True
-        else do
-          sendError clientHandle "Game is full."
-          return False
-    else do
-      sendError clientHandle "Game does not exist."
-      return False
-
 -- |Add participant to game
 joinPlayer :: AuthPlayerName -> Bool -> Game -> Game
 joinPlayer name host game@Game{..} =
@@ -139,28 +111,6 @@ addClientGame :: GameName -> Client -> Client
 addClientGame game client@Client{..} =
   client {clientInGame = Just game}
 
--- |Leave Game if normal player, close if host
-leaveGame :: Server -> Client -> GameName -> IO()
-leaveGame server@Server{..} client@Client{..} game = do
-      gameLis <- readTVarIO games
-      if clientName == gameHost (gameLis!game)
-        then do
-          clientLis <- readTVarIO clients
-          mapM_ (flip sendChannel GameClosedByHost
-                 . (!) clientLis. parName)
-            $ gamePlayers $ gameLis!game
-          removeGame server game
-          sendMessage clientHandle "Closed Game."
-        else do
-          removeClientInGame server client
-          clientLis <- readTVarIO clients
-          atomically $ writeTVar games
-            $ Map.adjust leavePlayer game gameLis
-          sendMessage clientHandle "Left Game."
-            where
-              leavePlayer gameOld@Game{..} =
-                gameOld {gamePlayers = Map.delete clientName gamePlayers}
-
 -- |Broadcast message to all Clients in a Game
 broadcastGame :: Server -> GameName -> InMessage -> IO ()
 broadcastGame Server{..} gameName msg = do
@@ -171,9 +121,9 @@ broadcastGame Server{..} gameName msg = do
 
 -- |Remove ClientInGame from client in servers clientmap
 removeClientInGame :: Server -> Client -> IO ()
-removeClientInGame server@Server{..} client@Client{..} = do
+removeClientInGame Server{..} Client{..} = do
   clientLis <- readTVarIO clients
   atomically $ writeTVar clients
     $ Map.adjust rmClientGame clientName clientLis
     where
-      rmClientGame client = client {clientInGame = Nothing}
+      rmClientGame cli = cli {clientInGame = Nothing}

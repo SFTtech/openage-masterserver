@@ -9,14 +9,10 @@
 module Protocol where
 
 import Data.Map.Strict as Map
-import Data.Aeson
 import Data.Aeson.TH
 import Data.Version
 import Data.Text(Text)
-import System.IO
 import Control.Concurrent.STM
-import Data.ByteString.Lazy as BL
-import Data.ByteString.Char8 as BC
 
 -- |Unique player account name
 type AuthPlayerName = Text
@@ -56,7 +52,11 @@ newParticipant parName parReady = Participant{parCiv="Britain",
 
 -- |Messages sent by Client
 data InMessage =
-  Broadcast {msg :: Text} |
+  AddPlayer{
+    name :: Text,
+    pw :: Text
+  } |
+  Broadcast {content :: Text} |
   Login {
     loginName :: AuthPlayerName,
     loginPassword :: Text

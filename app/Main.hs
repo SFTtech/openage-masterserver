@@ -14,12 +14,15 @@ import Control.Concurrent.STM
 import Control.Concurrent.Async
 import Control.Exception.Base (finally)
 import Control.Monad
+import Crypto.BCrypt
 import Data.Aeson
 import Data.ByteString as B
 import Data.ByteString.Lazy as BL
+import Data.ByteString.Char8 as BC
 import Data.List as L
 import Data.Map.Strict as Map
 import Data.Maybe
+import Data.Text as T
 import Data.Version (makeVersion)
 import Database.Persist
 import Network
@@ -77,12 +80,12 @@ checkVersion handle = do
 -- |Get login credentials from handle, add client to server
 -- clientmap and return Client
 checkAddClient :: Server -> Handle -> IO(Maybe Client)
-checkAddClient Server{..} handle = do
+checkAddClient server@Server{..} handle = do
   loginJson <- B.hGetLine handle
   case (decode . BL.fromStrict) loginJson of
     Just Login{..} -> do
       Just (Entity _ Player{..}) <- getPlayer loginName
-      if loginPassword == playerPassword
+      if validatePassword playerPassword (toBs loginPassword)
         then do
           clientMap <- readTVarIO clients
           client <- newClient playerUsername handle
@@ -97,9 +100,30 @@ checkAddClient Server{..} handle = do
                 $ Map.insert playerUsername client clientMap
               return $ Just client
         else return Nothing
+        where
+          toBs = BC.pack . T.unpack
+    Just AddPlayer{..} -> do
+      hash <- hashPw pw
+      res <- addPlayer name hash
+      case res of
+        Just _ -> do
+          sendMessage handle "Player successfully added."
+          checkAddClient server handle
+        Nothing -> do
+          sendError handle "Name taken."
+          checkAddClient server handle
     _ -> do
       sendError handle "Unknown Format."
       return Nothing
+
+hashPw :: Text -> IO BC.ByteString
+hashPw pw = do
+  mayHash <- hashPasswordUsingPolicy slowerBcryptHashingPolicy $ toBs pw
+  case mayHash of
+    Just hash -> return hash
+    Nothing -> error "Could not hash."
+  where
+    toBs = BC.pack . T.unpack
 
 -- |Runs individual Client
 runClient :: Server -> Client -> IO ()
@@ -195,7 +219,7 @@ gameLoop server@Server{..} client@Client{..} game= do
       gameLoop server client game
     GameStartedByHost -> do
       sendMessage clientHandle "Game started..."
-      inGameLoopPar server client game
+      inGameLoop server client game
     PlayerConfig{..} -> do
       gameLis <- readTVarIO games
       atomically $ writeTVar games
@@ -208,35 +232,75 @@ gameLoop server@Server{..} client@Client{..} game= do
       gameLoop server client game
 
 -- |Loop for Host in running Game
-inGameLoopHost :: Server -> Client -> GameName -> IO ()
-inGameLoopHost server@Server{..} client@Client{..} game = do
+inGameLoop :: Server -> Client -> GameName -> IO ()
+inGameLoop server@Server{..} client@Client{..} game = do
   msg <- atomically $ readTChan clientChan
   case msg of
-    GameResultMessage{..} -> do
-      broadcastGame server game $ Broadcast "Game Over."
-      leaveGame server client game
-      mainLoop server client
-    Broadcast content -> do
+    Broadcast{..} -> do
       sendMessage clientHandle content
-      mainLoop server client
-    Logout ->
-      sendMessage clientHandle "You have been logged out."
-    _ -> do
-      sendError clientHandle "Unknown Message."
-      inGameLoopHost server client game
-
--- |Loop for normal participant in running Game
-inGameLoopPar :: Server -> Client -> GameName -> IO ()
-inGameLoopPar server@Server{..} client@Client{..} game = do
-  msg <- atomically $ readTChan clientChan
-  case msg of
+      inGameLoop server client game
     GameClosedByHost -> do
       removeClientInGame server client
       sendMessage clientHandle "Game was closed by Host."
       mainLoop server client
-    Broadcast content -> do
-      sendMessage clientHandle content
-      mainLoop server client
+    GameLeave -> do
+      leaveGame server client game
+      gameLoop server client game
+    GameResultMessage{..} -> do
+      gameLis <- readTVarIO games
+      if clientName == gameHost (gameLis!game)
+        then do
+          broadcastGame server game $ Broadcast "Game Over."
+          leaveGame server client game
+          inGameLoop server client game
+        else do
+          sendError clientHandle "Unknown Message."
+          inGameLoop server client game
+    Logout ->
+      sendMessage clientHandle "You have been logged out."
     _ -> do
       sendError clientHandle "Unknown Message."
-      inGameLoopPar server client game
+      inGameLoop server client game
+
+-- |Join Game and return True if join was successful
+joinGame :: Server -> Client -> GameName -> IO Bool
+joinGame Server{..} Client{..} gameId = do
+  gameLis <- readTVarIO games
+  if member gameId gameLis
+    then do
+      let Game{..} = gameLis!gameId
+      if Map.size gamePlayers < numPlayers
+        then do
+          clientLis <- readTVarIO clients
+          atomically $ writeTVar clients
+            $ Map.adjust (addClientGame gameId) clientName clientLis
+          atomically $ writeTVar games
+            $ Map.adjust (joinPlayer clientName False) gameId gameLis
+          sendMessage clientHandle "Joined Game."
+          return True
+        else do
+          sendError clientHandle "Game is full."
+          return False
+    else do
+      sendError clientHandle "Game does not exist."
+      return False
+
+-- |Leave Game if normal player, close if host
+leaveGame :: Server -> Client -> GameName -> IO()
+leaveGame server@Server{..} client@Client{..} game = do
+      gameLis <- readTVarIO games
+      if clientName == gameHost (gameLis!game)
+        then do
+          clientLis <- readTVarIO clients
+          mapM_ (flip sendChannel GameClosedByHost
+                 . (!) clientLis. parName)
+            $ gamePlayers $ gameLis!game
+          removeGame server game
+        else do
+          removeClientInGame server client
+          atomically $ writeTVar games
+            $ Map.adjust leavePlayer game gameLis
+          sendMessage clientHandle "Left Game."
+            where
+              leavePlayer gameOld@Game{..} =
+                gameOld {gamePlayers = Map.delete clientName gamePlayers}
