@@ -12,7 +12,7 @@ module Main where
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.Async
-import Control.Exception.Base(finally)
+import Control.Exception.Base (finally)
 import Control.Monad
 import Data.Aeson
 import Data.ByteString as B
@@ -20,6 +20,7 @@ import Data.ByteString.Lazy as BL
 import Data.List as L
 import Data.Map.Strict as Map
 import Data.Maybe
+import Data.Version (makeVersion)
 import Database.Persist
 import Network
 import Text.Printf
@@ -60,10 +61,12 @@ talk handle server = do
 checkVersion :: S.Handle -> IO ()
 checkVersion handle = do
   verJson <- B.hGetLine handle
+  (conf, _) <- loadConf
+  myVersion <- getVersion conf
   if (peerProtocolVersion .
       fromJust .
       decode .
-      BL.fromStrict) verJson == myVersion
+      BL.fromStrict) verJson == makeVersion myVersion
     then
       sendMessage handle "Version accepted."
     else do

@@ -6,7 +6,6 @@
  -}
 module Server where
 
-import Control.Exception.Base
 import Data.ByteString as B
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
@@ -18,11 +17,8 @@ import System.IO as S
 import Control.Concurrent.STM
 import Data.Version
 import Network
-import Config
 import Protocol
 import DBSchema
-
-myVersion = Version [1, 0, 0] []
 
 -- |Server Datatype
 -- Stores Map of running Games and Map of logged in clients

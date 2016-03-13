@@ -29,3 +29,6 @@ loadCfgStr config = do
 
 getPort :: Config -> IO Int
 getPort config = require config "port"
+
+getVersion :: Config -> IO [Int]
+getVersion config = require config "acceptedVersion"
