@@ -114,12 +114,19 @@ checkAddClient Server{..} handle = do
     Just Login{..} -> do
       Just (Entity _ Player{..}) <- getPlayer loginName
       if loginPassword == playerPassword
-        then atomically $ do
-          clientMap <- readTVar clients
+        then do
+          clientMap <- readTVarIO clients
           client <- newClient playerUsername handle
-          writeTVar clients
-            $ Map.insert playerUsername client clientMap
-          return $ Just client
+          if member playerUsername clientMap
+            then do
+              sendChannel (clientMap!playerUsername) Logout
+              atomically $ writeTVar clients
+                $ Map.insert playerUsername client clientMap
+              return $ Just client
+            else atomically $ do
+              writeTVar clients
+                $ Map.insert playerUsername client clientMap
+              return $ Just client
         else return Nothing
     _ -> do
       sendError handle "Unknown Format."
@@ -184,6 +191,8 @@ mainLoop server@Server{..} client@Client{..} = do
       if success
         then gameLoop server client gameId
         else mainLoop server client
+    Logout ->
+      sendMessage clientHandle "You have been logged out."
     _ -> do
       sendError clientHandle "Unknown Message."
       mainLoop server client
@@ -227,6 +236,8 @@ gameLoop server@Server{..} client@Client{..} game= do
       atomically $ writeTVar games
         $ Map.adjust (updatePlayer clientName playerCiv playerTeam playerReady) game gameLis
       gameLoop server client game
+    Logout ->
+      sendMessage clientHandle "You have been logged out."
     _ -> do
       sendError clientHandle "Unknown Message."
       gameLoop server client game
@@ -243,6 +254,8 @@ inGameLoopHost server@Server{..} client@Client{..} game = do
     Broadcast msg -> do
       sendMessage clientHandle msg
       mainLoop server client
+    Logout ->
+      sendMessage clientHandle "You have been logged out."
     _ -> do
       sendError clientHandle "Unknown Message."
       inGameLoopHost server client game

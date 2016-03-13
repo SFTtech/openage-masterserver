@@ -33,9 +33,9 @@ instance Show Client where
 type AuthPlayerName = Text
 
 -- |Client constructor
-newClient :: AuthPlayerName -> Handle -> STM Client
+newClient :: AuthPlayerName -> Handle -> IO Client
 newClient clientName clientHandle = do
-  clientChan <- newTChan
+  clientChan <- newTChanIO
   return Client{clientInGame=Nothing,..}
 
 -- |Sends InMessage to the clients channel
@@ -96,6 +96,7 @@ data InMessage =
   GameResultMessage {result :: GameResult} |
   GameStart |
   GameStartedByHost |
+  Logout |
   PlayerConfig {
     playerCiv :: Text,
     playerTeam :: Int,
