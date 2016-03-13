@@ -77,6 +77,7 @@ executable openage-masterserver-test
                      , transformers >= 0.4
                      , configurator
                      , mtl
+                     , keys
                      , stm >= 2.4
                      , monad-logger >= 0.3
                      , network >= 2.6

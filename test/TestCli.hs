@@ -8,12 +8,14 @@
 -- and can send Messages defined in Protocol to the server
 module Main where
 
+import Data.Key
 import Control.Monad
 import Control.Concurrent.Async
 import System.Environment
 import Text.Printf
 import Data.Version
 import Data.Aeson
+import Data.Map as Map
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Char8 as B
 import System.IO
@@ -73,6 +75,7 @@ handleAnswer handle = do
     Just P.Error{..} -> printf "Error: %s\n" errorString
     Just GameInfoAnswer{..} -> printFormattedGame game
     Just GameQueryAnswer{..} -> printFormattedGames gameList
+    Just GameStartAnswer{..} -> printFormattedGameStart playerMap
     _ -> T.putStrLn "Error: Decoding error."
 
 mainLoop :: Handle -> IO ()
@@ -91,8 +94,8 @@ handleLobbyInput handle = do
     ["gameconfig", gMap, mode, num] -> do
       sendEncoded handle (GameConfig gMap mode ((read . TE.unpack) num))
       handleLobbyInput handle
-    ["result"] -> do
-      sendEncoded handle (GameResultMessage Victory)
+    ["gameover"] -> do
+      sendEncoded handle GameOver
       handleLobbyInput handle
     ["join", name] -> do
       sendEncoded handle $ GameJoin name
@@ -141,15 +144,19 @@ printCommands = do
   printf "Gamelobby:\n"
   printf "\tinfo - show info about current game \n"
   printf "\tleave - leave Game, close if Host \n"
-  printf "\tstart - start the game. Only the host can start the\
-         \ game. All Players need to be ready. \n"
+  printf "\tstart - Only Host: start the game, all Players need to be ready.\n"
   printf "\tplayerConfig Text:CIV Int:TEAM Bool:READY-\
          \ change Players settings.\n"
   printf "Ingame:\n"
   printf "\tleave - leave Game, close if Host \n"
-  printf "\tresult - send gameresult, terminates game.\n"
+  printf "\tgameover - Only Host: send gameover, terminates game.\n"
   printf "General:\n"
   printf "\texit - Close testclient \n"
+
+printFormattedGameStart :: Map.Map AuthPlayerName HostName -> IO ()
+printFormattedGameStart pMap = do
+  printf "Gameinfo to start p2p:\n"
+  mapWithKeyM_ (printf "\t%s: %s\n") pMap
 
 printFormattedGame :: Game -> IO ()
 printFormattedGame Game{..} = do

@@ -6,6 +6,7 @@
  -}
 module Server where
 
+import Network
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
 import Data.Aeson
@@ -32,14 +33,15 @@ newServer = do
 -- It stores players name, handle and a channel to address it.
 data Client = Client {
   clientName :: AuthPlayerName,
+  clientAddr :: HostName,
   clientHandle :: Handle,
   clientChan :: TChan InMessage,
   clientInGame :: Maybe Text
   }
 
 -- |Client constructor
-newClient :: AuthPlayerName -> Handle -> IO Client
-newClient clientName clientHandle = do
+newClient :: AuthPlayerName -> HostName -> Handle -> IO Client
+newClient clientName clientAddr clientHandle = do
   clientChan <- newTChanIO
   return Client{clientInGame=Nothing,..}
 

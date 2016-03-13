@@ -44,15 +44,15 @@ main = withSocketsDo $ do
   forever $ do
       (handle, host, clientPort) <- accept sock
       printf "Accepted connection from %s: %s\n" host (show clientPort)
-      forkFinally (talk handle server) (\_ ->
+      forkFinally (talk handle server host) (\_ ->
         printf "Connection from %s closed\n" host >> hClose handle)
 
-talk :: Handle -> Server -> IO()
-talk handle server = do
+talk :: Handle -> Server -> HostName -> IO()
+talk handle server hostname = do
   S.hSetNewlineMode handle universalNewlineMode
   S.hSetBuffering handle LineBuffering
   checkVersion handle
-  mayClient <- checkAddClient server handle
+  mayClient <- checkAddClient handle server hostname
   case mayClient of
     Just client@Client{..} -> do
       sendMessage handle "Login success."
@@ -79,8 +79,8 @@ checkVersion handle = do
 
 -- |Get login credentials from handle, add client to server
 -- clientmap and return Client
-checkAddClient :: Server -> Handle -> IO(Maybe Client)
-checkAddClient server@Server{..} handle = do
+checkAddClient :: Handle -> Server -> HostName -> IO(Maybe Client)
+checkAddClient handle server@Server{..} hostname = do
   loginJson <- B.hGetLine handle
   case (decode . BL.fromStrict) loginJson of
     Just Login{..} -> do
@@ -88,7 +88,7 @@ checkAddClient server@Server{..} handle = do
       if validatePassword playerPassword (toBs loginPassword)
         then do
           clientMap <- readTVarIO clients
-          client <- newClient playerUsername handle
+          client <- newClient playerUsername hostname handle
           if member playerUsername clientMap
             then do
               sendChannel (clientMap!playerUsername) Logout
@@ -108,14 +108,15 @@ checkAddClient server@Server{..} handle = do
       case res of
         Just _ -> do
           sendMessage handle "Player successfully added."
-          checkAddClient server handle
+          checkAddClient handle server hostname
         Nothing -> do
           sendError handle "Name taken."
-          checkAddClient server handle
+          checkAddClient handle server hostname
     _ -> do
       sendError handle "Unknown Format."
       return Nothing
 
+-- |Uses BCrypt to hash pw before writing it to db
 hashPw :: Text -> IO BC.ByteString
 hashPw pw = do
   mayHash <- hashPasswordUsingPolicy slowerBcryptHashingPolicy $ toBs pw
@@ -196,10 +197,14 @@ gameLoop server@Server{..} client@Client{..} game= do
   case msg of
     GameStart ->
       if isHost
-        then
-          if L.all parReady $ gamePlayers $ gameLis!game
+        then do
+          let thisPlayers = gamePlayers $ gameLis!game
+          if L.all parReady thisPlayers
             then do
+              clientLis <- readTVarIO clients
               broadcastGame server game GameStartedByHost
+              sendEncoded clientHandle
+                $ GameStartAnswer $ convMap clientLis (keys thisPlayers)
               gameLoop server client game
             else do
               sendError clientHandle "Players not ready."
@@ -244,6 +249,13 @@ gameLoop server@Server{..} client@Client{..} game= do
       sendError clientHandle "Unknown Message."
       gameLoop server client game
 
+-- |Convert the clientmap with filter to the map format used in
+-- GameStartAnswer
+convMap :: Map.Map AuthPlayerName Client -> [AuthPlayerName] ->
+           Map.Map AuthPlayerName HostName
+convMap inMap lis =
+  Map.map clientAddr (Map.filterWithKey (\k _ -> k `L.elem` lis) inMap)
+
 -- |Loop for Host in running Game
 inGameLoop :: Server -> Client -> GameName -> IO ()
 inGameLoop server@Server{..} client@Client{..} game = do
@@ -261,7 +273,7 @@ inGameLoop server@Server{..} client@Client{..} game = do
     GameLeave -> do
       leaveGame server client game
       gameLoop server client game
-    GameResultMessage{..} ->
+    GameOver ->
       if isHost
         then do
           broadcastGame server game $ Broadcast "Game Over."

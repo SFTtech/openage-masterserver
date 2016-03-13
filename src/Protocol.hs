@@ -13,6 +13,7 @@ import Data.Aeson.TH
 import Data.Version
 import Data.Text(Text)
 import Control.Concurrent.STM
+import Network
 
 -- |Unique player account name
 type AuthPlayerName = Text
@@ -81,7 +82,7 @@ data InMessage =
   } |
   GameLeave |
   GameQuery |
-  GameResultMessage {result :: GameResult} |
+  GameOver  |
   GameStart |
   GameStartedByHost |
   Logout |
@@ -94,11 +95,10 @@ data InMessage =
     peerProtocolVersion :: Version
   } deriving (Show, Read, Eq)
 
-data GameResult = Victory | Defeat
-  deriving (Show, Read, Eq)
 
 -- |Messages sent by Server
 data OutMessage =
+  GameStartAnswer {playerMap :: Map AuthPlayerName HostName} |
   GameQueryAnswer {gameList :: [Game]} |
   GameInfoAnswer {game :: Game} |
   Error {errorString :: Text} |
@@ -109,6 +109,5 @@ Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                                      ''Participant,
                                                      ''Game,
                                                      ''GameStat,
-                                                     ''GameResult,
                                                      ''OutMessage,
                                                      ''Version]
