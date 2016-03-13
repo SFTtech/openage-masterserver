@@ -85,6 +85,10 @@ checkAddGame Server{..} pName (GameInit gName gMap gPlay) =
               return $ Just game
 checkAddGame _ _ _ = return Nothing
 
+updateGame :: Text -> Text -> Int -> Game -> Game
+updateGame map mode num game =
+  game {gameMap=map, gameMode=mode, numPlayers=num}
+
 -- |Remove Game from servers game map
 removeGame :: Server -> GameName -> IO ()
 removeGame Server{..} name = atomically $
@@ -107,17 +111,9 @@ updatePlayer name civ team rdy game@Game{..} =
                          parReady=rdy}
 
 -- |Add Game to Clients clientInGame field
-addClientGame :: GameName -> Client -> Client
-addClientGame game client@Client{..} =
+addClientInGame :: GameName -> Client -> Client
+addClientInGame game client@Client{..} =
   client {clientInGame = Just game}
-
--- |Broadcast message to all Clients in a Game
-broadcastGame :: Server -> GameName -> InMessage -> IO ()
-broadcastGame Server{..} gameName msg = do
-  clientLis <- readTVarIO clients
-  gameLis <- readTVarIO games
-  mapM_ (flip sendChannel msg . (!) clientLis . parName)
-    $ gamePlayers $ gameLis!gameName
 
 -- |Remove ClientInGame from client in servers clientmap
 removeClientInGame :: Server -> Client -> IO ()
@@ -127,3 +123,11 @@ removeClientInGame Server{..} Client{..} = do
     $ Map.adjust rmClientGame clientName clientLis
     where
       rmClientGame cli = cli {clientInGame = Nothing}
+
+-- |Broadcast message to all Clients in a Game
+broadcastGame :: Server -> GameName -> InMessage -> IO ()
+broadcastGame Server{..} gameName msg = do
+  clientLis <- readTVarIO clients
+  gameLis <- readTVarIO games
+  mapM_ (flip sendChannel msg . (!) clientLis . parName)
+    $ gamePlayers $ gameLis!gameName

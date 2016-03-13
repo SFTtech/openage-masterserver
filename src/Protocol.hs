@@ -23,6 +23,7 @@ data Game = Game {
   gameHost :: AuthPlayerName,
   gameName:: GameName,
   gameMap :: Text,
+  gameMode :: Text,
   numPlayers :: Int,
   gamePlayers :: Map AuthPlayerName Participant,
   gameState :: GameStat
@@ -36,7 +37,9 @@ data GameStat = Lobby | Running | Aborted | Finished
 
 newGame :: GameName -> AuthPlayerName -> Text -> Int -> STM Game
 newGame gameName gameHost gameMap numPlayers =
-  return Game {gameState=Lobby, gamePlayers=Map.empty, ..}
+  return Game {gameState=Lobby,
+               gamePlayers=Map.empty,
+               gameMode="Deathmatch", ..}
 
 -- |Game participant, players ingame settings
 data Participant = Participant {
@@ -62,6 +65,11 @@ data InMessage =
     loginPassword :: Text
   } |
   GameClosedByHost |
+  GameConfig {
+    gameConfMap :: Text,
+    gameConfMode :: Text,
+    gameConfPlayerNum :: Int
+  } |
   GameInfo |
   GameInit {
     gameInitName :: GameName,

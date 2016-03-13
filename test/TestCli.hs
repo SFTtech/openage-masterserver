@@ -56,7 +56,7 @@ getSendCredentials handle = do
       handleAnswer handle
       getSendCredentials handle
     ["login" ,name ,pass] -> do
-      sendLogin handle name pass
+      sendEncoded handle $ Login name pass
       handleAnswer handle
     ["help"] -> do
       printCommands
@@ -87,6 +87,9 @@ handleLobbyInput handle = do
     ["playerconfig", civ, team, rdy] -> do
       sendEncoded handle (PlayerConfig civ ((read . TE.unpack) team)
                           ((read . TE.unpack) rdy))
+      handleLobbyInput handle
+    ["gameconfig", gMap, mode, num] -> do
+      sendEncoded handle (GameConfig gMap mode ((read . TE.unpack) num))
       handleLobbyInput handle
     ["result"] -> do
       sendEncoded handle (GameResultMessage Victory)
@@ -176,7 +179,3 @@ sendGameQuery handle =
 sendGameInit :: Handle -> GameName -> Text -> Int -> IO ()
 sendGameInit handle name gameMap players =
   sendEncoded handle $ GameInit name gameMap players
-
-sendLogin :: Handle -> AuthPlayerName -> Text -> IO ()
-sendLogin handle name pass =
-  sendEncoded handle $ Login name pass

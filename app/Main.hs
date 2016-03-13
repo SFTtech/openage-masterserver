@@ -168,7 +168,7 @@ mainLoop server@Server{..} client@Client{..} = do
           gameLis <- readTVarIO games
           clientLis <- readTVarIO clients
           atomically $ writeTVar clients
-            $ Map.adjust (addClientGame gameName) clientName clientLis
+            $ Map.adjust (addClientInGame gameName) clientName clientLis
           atomically $ writeTVar games
             $ Map.adjust (joinPlayer clientName True) gameName gameLis
           sendMessage clientHandle "Added game."
@@ -191,10 +191,11 @@ mainLoop server@Server{..} client@Client{..} = do
 gameLoop :: Server -> Client -> GameName -> IO ()
 gameLoop server@Server{..} client@Client{..} game= do
   msg <- atomically $ readTChan clientChan
+  gameLis <- readTVarIO games
+  let isHost = clientName == gameHost (gameLis!game)
   case msg of
-    GameStart -> do
-      gameLis <- readTVarIO games
-      if clientName == gameHost (gameLis!game)
+    GameStart ->
+      if isHost
         then
           if L.all parReady $ gamePlayers $ gameLis!game
             then do
@@ -207,9 +208,22 @@ gameLoop server@Server{..} client@Client{..} game= do
           sendError clientHandle "Only the host can start the game."
           gameLoop server client game
     GameInfo -> do
-      gameLis <- readTVarIO games
       sendEncoded clientHandle $ GameInfoAnswer (gameLis!game)
       gameLoop server client game
+    GameConfig{..} ->
+      if isHost
+        then
+          if gameConfPlayerNum >= (Map.size . gamePlayers) (gameLis!game)
+            then do
+              atomically $ writeTVar games
+                $ Map.adjust (updateGame gameConfMap gameConfMode gameConfPlayerNum) game gameLis
+              gameLoop server client game
+            else do
+              sendError clientHandle "Can't choose less Players."
+              gameLoop server client game
+        else do
+          sendError clientHandle "Unknown Message."
+          inGameLoop server client game
     GameClosedByHost -> do
       removeClientInGame server client
       sendMessage clientHandle "Game was closed by Host."
@@ -221,7 +235,6 @@ gameLoop server@Server{..} client@Client{..} game= do
       sendMessage clientHandle "Game started..."
       inGameLoop server client game
     PlayerConfig{..} -> do
-      gameLis <- readTVarIO games
       atomically $ writeTVar games
         $ Map.adjust (updatePlayer clientName playerCiv playerTeam playerReady) game gameLis
       gameLoop server client game
@@ -235,6 +248,8 @@ gameLoop server@Server{..} client@Client{..} game= do
 inGameLoop :: Server -> Client -> GameName -> IO ()
 inGameLoop server@Server{..} client@Client{..} game = do
   msg <- atomically $ readTChan clientChan
+  gameLis <- readTVarIO games
+  let isHost = clientName == gameHost (gameLis!game)
   case msg of
     Broadcast{..} -> do
       sendMessage clientHandle content
@@ -246,9 +261,8 @@ inGameLoop server@Server{..} client@Client{..} game = do
     GameLeave -> do
       leaveGame server client game
       gameLoop server client game
-    GameResultMessage{..} -> do
-      gameLis <- readTVarIO games
-      if clientName == gameHost (gameLis!game)
+    GameResultMessage{..} ->
+      if isHost
         then do
           broadcastGame server game $ Broadcast "Game Over."
           leaveGame server client game
@@ -273,7 +287,7 @@ joinGame Server{..} Client{..} gameId = do
         then do
           clientLis <- readTVarIO clients
           atomically $ writeTVar clients
-            $ Map.adjust (addClientGame gameId) clientName clientLis
+            $ Map.adjust (addClientInGame gameId) clientName clientLis
           atomically $ writeTVar games
             $ Map.adjust (joinPlayer clientName False) gameId gameLis
           sendMessage clientHandle "Joined Game."
