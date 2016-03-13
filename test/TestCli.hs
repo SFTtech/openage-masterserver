@@ -14,6 +14,8 @@ import System.IO
 import Data.Text as TE
 import Data.Text.IO as T
 import Network
+
+import Server
 import Protocol as P
 
 main :: IO ()
