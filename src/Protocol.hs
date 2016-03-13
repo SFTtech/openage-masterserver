@@ -18,6 +18,9 @@ import Control.Concurrent.STM
 import Data.ByteString.Lazy as BL
 import Data.ByteString.Char8 as BC
 
+-- |Unique player account name
+type AuthPlayerName = Text
+
 -- |Game datatype
 -- It stores information about an open game
 data Game = Game {
@@ -31,7 +34,7 @@ data Game = Game {
 
 type GameName = Text
 
--- | Game Status
+-- |Game Status
 data GameStat = Lobby | Running | Aborted | Finished
   deriving (Show, Read, Eq)
 
@@ -39,6 +42,7 @@ newGame :: GameName -> AuthPlayerName -> Text -> Int -> STM Game
 newGame gameName gameHost gameMap numPlayers =
   return Game {gameState=Lobby, gamePlayers=Map.empty, ..}
 
+-- |Game participant, players ingame settings
 data Participant = Participant {
   parName :: AuthPlayerName,
   parCiv :: Text,
@@ -49,9 +53,8 @@ data Participant = Participant {
 newParticipant :: AuthPlayerName -> Bool -> Participant
 newParticipant parName parReady = Participant{parCiv="Britain",
                                               parTeam=0, ..}
-type AuthPlayerName = Text
 
--- | Messages sent by Client
+-- |Messages sent by Client
 data InMessage =
   Broadcast {msg :: Text} |
   Login {
@@ -86,7 +89,7 @@ data InMessage =
 data GameResult = Victory | Defeat
   deriving (Show, Read, Eq)
 
--- | Messages sent by Server
+-- |Messages sent by Server
 data OutMessage =
   GameQueryAnswer {gameList :: [Game]} |
   GameInfoAnswer {game :: Game} |
