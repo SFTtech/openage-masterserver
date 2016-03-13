@@ -192,7 +192,7 @@ gameLoop server@Server{..} client@Client{..} game= do
       mainLoop server client
     GameLeave -> do
       leaveGame server client game
-      gameLoop server client
+      gameLoop server client game
     GameStartedByHost -> do
       sendMessage clientHandle "Game started..."
       inGameLoopPar server client game
