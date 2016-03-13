@@ -269,13 +269,19 @@ joinGame server@Server{..} client@Client{..} gameId = do
   gameLis <- readTVarIO games
   if member gameId gameLis
     then do
-      clientLis <- readTVarIO clients
-      atomically $ writeTVar clients
-        $ Map.adjust (addClientGame gameId) clientName clientLis
-      atomically $ writeTVar games
-        $ Map.adjust (joinPlayer clientName False) gameId gameLis
-      sendMessage clientHandle "Joined Game."
-      return True
+      let Game{..} = gameLis!gameId
+      if Map.size gamePlayers < numPlayers
+        then do
+          clientLis <- readTVarIO clients
+          atomically $ writeTVar clients
+            $ Map.adjust (addClientGame gameId) clientName clientLis
+          atomically $ writeTVar games
+            $ Map.adjust (joinPlayer clientName False) gameId gameLis
+          sendMessage clientHandle "Joined Game."
+          return True
+        else do
+          sendError clientHandle "Game is full."
+          return False
     else do
       sendError clientHandle "Game does not exist."
       return False
