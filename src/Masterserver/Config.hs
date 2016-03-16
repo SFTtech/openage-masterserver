@@ -1,9 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-|
- -Copyright 2016-2016 the openage authors.
- -See copying.md for legal info.
- -}
-module Config where
+------------------------------------------------------------------------------
+-- |
+-- Copyright 2016-2016 the openage authors. See copying.md for legal info.
+-- Module: Masterserver.Config
+--
+-- This Module defines the masterservers config parser.
+
+------------------------------------------------------------------------------
+module Masterserver.Config (
+
+  -- * loads config
+  loadConf,
+  -- ** get Values from config
+  loadCfgStr, getPort, getVersion
+
+  )where
 
 import Prelude hiding (concat, lookup, putStrLn)
 import Data.ByteString

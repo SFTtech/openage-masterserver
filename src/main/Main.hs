@@ -12,7 +12,7 @@
 -- to start communicating with each other.
 
 -----------------------------------------------------------------------------
-module Main where
+module Masterserver.Main where
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -34,10 +34,10 @@ import Network
 import Text.Printf
 import System.IO as S
 
-import Config
-import Server
-import Protocol
-import DBSchema
+import Masterserver.Config
+import Masterserver.Database
+import Masterserver.Protocol as P
+import Masterserver.Server
 
 main :: IO ()
 main = withSocketsDo $ do

@@ -1,21 +1,29 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-|
- -Copyright 2016-2016 the openage authors.
- -See copying.md for legal info.
- -}
-module Server where
 
-import Network
+------------------------------------------------------------------------------
+-- |
+-- Copyright 2016-2016 the openage authors. See copying.md for legal info.
+-- Module: Masterserver.Server
+--
+-- This module defines the server datatype and several helperfunctions
+-- for the masterservers server logic.
+
+------------------------------------------------------------------------------
+
+module Masterserver.Server where
+
+import Control.Concurrent.STM
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
 import Data.Aeson
 import Data.List as L
 import Data.Text
 import Data.Map.Strict as Map
+import Network
 import System.IO as S
-import Control.Concurrent.STM
-import Protocol
+
+import Masterserver.Protocol as P
 
 -- |Server Datatype
 -- Stores Map of running Games and Map of logged in clients
@@ -68,7 +76,7 @@ sendMessage handle text =
 -- |Send encoded Error message
 sendError :: Handle -> Text -> IO()
 sendError handle text =
-  sendEncoded handle $ Protocol.Error text
+  sendEncoded handle $ P.Error text
 
 -- |Get List of Games in servers game map
 getGameList :: Server -> IO [Game]

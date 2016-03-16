@@ -1,11 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
--- |Copyright 2016-2016 the openage authors.
--- See copying.md for legal info.
+------------------------------------------------------------------------------
+-- |
+-- Copyright 2016-2016 the openage authors. See copying.md for legal info.
 --
 -- Main entry file for a test-client
 -- this client takes a host and a port as argument
 -- and can send Messages defined in Protocol to the server
+
+------------------------------------------------------------------------------
 module Main where
 
 import Data.Key
@@ -23,8 +26,8 @@ import Data.Text as TE
 import Data.Text.IO as T
 import Network
 
-import Server
-import Protocol as P
+import Masterserver.Server
+import Masterserver.Protocol as P
 
 main :: IO ()
 main = withSocketsDo $ do

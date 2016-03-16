@@ -6,12 +6,17 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE TypeFamilies               #-}
-{-# OPTIONS_GHC -fno-warn-orphans #-}
-{-|
- -Copyright 2016-2016 the openage authors.
- -See copying.md for legal info.
- -}
-module DBSchema where
+
+------------------------------------------------------------------------------
+-- |
+-- Copyright 2016-2016 the openage authors. See copying.md for legal info.
+-- Module: Masterserver: Masterserver.Database
+--
+-- This Module defines the database scheme used by the masterserver and
+-- provides database access functions
+
+------------------------------------------------------------------------------
+module Masterserver.Database where
 
 import Data.ByteString.Char8 as BC
 import Database.Persist as P
@@ -20,7 +25,8 @@ import Database.Persist.TH
 import Data.Text
 import Control.Monad.Logger
 import Control.Monad.IO.Class
-import Config
+
+import Masterserver.Config
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
 Player

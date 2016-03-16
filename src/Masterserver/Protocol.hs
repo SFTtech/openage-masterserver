@@ -6,7 +6,7 @@
 ------------------------------------------------------------------------------
 -- |
 -- Copyright 2016-2016 the openage authors. See copying.md for legal info.
--- Module: Protocol
+-- Module: Masterserver.Protocol
 --
 -- This Module defines the JSON protocol used in client-server
 -- communicaton.
@@ -15,24 +15,23 @@
 -- to the client are of type OutMessage.
 
 ------------------------------------------------------------------------------
-module Protocol (
+module Masterserver.Protocol (
 
-  -- Messages sent by client and server
-  InMessage, OutMessage,
+  -- Messages sent and received by server
+  InMessage(..), OutMessage(..),
 
-  -- Game datatype
-  Game,
-
-  -- Helper types
-  AuthPlayerName, GameName, Participant, GameStat
+  -- * Game datatype
+  Game(..), newGame,
+  -- ** Helper types
+  AuthPlayerName, GameName, GameStat, Participant(..), newParticipant
 
   ) where
 
-import Data.Map.Strict as Map
-import Data.Aeson.TH
-import Data.Version
-import Data.Text(Text)
 import Control.Concurrent.STM
+import Data.Aeson.TH
+import Data.Map.Strict as Map
+import Data.Text(Text)
+import Data.Version
 import Network
 
 -- |Messages sent by Client
@@ -51,6 +50,7 @@ data InMessage =
     loginName :: AuthPlayerName,
     loginPassword :: Text
   } |
+  Logout |
   GameClosedByHost |
   GameConfig {
     gameConfMap :: Text,
@@ -71,7 +71,6 @@ data InMessage =
   GameOver  |
   GameStart |
   GameStartedByHost |
-  Logout |
   PlayerConfig {
     playerCiv :: Text,
     playerTeam :: Int,
