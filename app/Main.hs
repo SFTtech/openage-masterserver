@@ -1,12 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
--- |Copyright 2016-2016 the openage authors.
--- See copying.md for legal info.
+
+-----------------------------------------------------------------------------
+-- |
+-- Copyright 2016-2016 the openage authors. See copying.md for legal info.
+-- Module: Main
 --
--- main entry file for the openage masterserver
+-- Main entry file for the openage masterserver
 -- this server will listen on a tcp socket
 -- and provide a funny API for gameservers and clients
 -- to start communicating with each other.
+
+-----------------------------------------------------------------------------
 module Main where
 
 import Control.Concurrent
