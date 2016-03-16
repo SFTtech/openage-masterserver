@@ -12,7 +12,7 @@
 -- to start communicating with each other.
 
 -----------------------------------------------------------------------------
-module Masterserver.Main where
+module Main where
 
 import Control.Concurrent
 import Control.Concurrent.STM
