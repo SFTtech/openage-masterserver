@@ -15,17 +15,18 @@
 -- to the client are of type OutMessage.
 
 ------------------------------------------------------------------------------
-module Masterserver.Protocol (
 
-  -- Messages sent and received by server
-  InMessage(..), OutMessage(..),
-
-  -- * Game datatype
-  Game(..), newGame,
-  -- ** Helper types
-  AuthPlayerName, GameName, GameStat, Participant(..), newParticipant
-
-  ) where
+module Masterserver.Protocol
+       (InMessage(..),
+        OutMessage(..),
+        Game(..),
+        newGame,
+        AuthPlayerName,
+        GameName,
+        GameStat,
+        Participant(..),
+        newParticipant)
+       where
 
 import Control.Concurrent.STM
 import Data.Aeson.TH
@@ -41,10 +42,10 @@ data InMessage =
     pw :: Text
   } |
   Broadcast {content :: Text} |
-  ChatIn {content :: Text} |
-  ChatOut {
-    origin :: AuthPlayerName,
-    content :: Text
+  ChatFromClient {chatFromCContent :: Text} |
+  ChatFromThread {
+    chatFromTOrign :: AuthPlayerName,
+    chatFromTContent :: Text
   } |
   Login {
     loginName :: AuthPlayerName,
@@ -82,6 +83,10 @@ data InMessage =
 
 -- |Messages sent by Server
 data OutMessage =
+  ChatOut {
+    chatOutOrigin :: AuthPlayerName,
+    chatOutContent :: Text
+  } |
   GameStartAnswer {playerMap :: Map AuthPlayerName HostName} |
   GameQueryAnswer {gameList :: [Game]} |
   GameInfoAnswer {game :: Game} |
@@ -104,6 +109,7 @@ data Game = Game {
 -- |Unique player account name
 type AuthPlayerName = Text
 
+-- |Unique game name
 type GameName = Text
 
 -- |Game Status

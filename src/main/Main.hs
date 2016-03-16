@@ -82,7 +82,7 @@ checkVersion handle = do
       thread <- myThreadId
       killThread thread
 
--- |Get login credentials from handle, add client to server
+-- |Get login credentials from handle, add client to servers
 -- clientmap and return Client
 checkAddClient :: Handle -> Server -> HostName -> IO(Maybe Client)
 checkAddClient handle server@Server{..} hostname = do
@@ -201,6 +201,14 @@ gameLoop server@Server{..} client@Client{..} game= do
   let isHost = clientName == gameHost (gameLis!game)
       thisPlayers = gamePlayers $ gameLis!game
   case msg of
+    ChatFromClient{..} -> do
+      broadcastGame server game
+        $ ChatFromThread clientName chatFromCContent
+      gameLoop server client game
+    ChatFromThread{..} -> do
+      sendEncoded clientHandle
+        $ ChatOut chatFromTOrign chatFromTContent
+      gameLoop server client game
     GameStart
       | isHost && L.all parReady thisPlayers -> do
           clientLis <- readTVarIO clients
