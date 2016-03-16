@@ -194,39 +194,37 @@ gameLoop server@Server{..} client@Client{..} game= do
   msg <- atomically $ readTChan clientChan
   gameLis <- readTVarIO games
   let isHost = clientName == gameHost (gameLis!game)
+      thisPlayers = gamePlayers $ gameLis!game
   case msg of
-    GameStart ->
-      if isHost
-        then do
-          let thisPlayers = gamePlayers $ gameLis!game
-          if L.all parReady thisPlayers
-            then do
-              clientLis <- readTVarIO clients
-              broadcastGame server game GameStartedByHost
-              sendEncoded clientHandle
-                $ GameStartAnswer $ convMap clientLis (keys thisPlayers)
-              gameLoop server client game
-            else do
-              sendError clientHandle "Players not ready."
-              gameLoop server client game
-        else do
+    GameStart
+      | isHost && L.all parReady thisPlayers -> do
+          clientLis <- readTVarIO clients
+          broadcastGame server game GameStartedByHost
+          sendEncoded clientHandle
+            $ GameStartAnswer $ convMap clientLis (keys thisPlayers)
+          gameLoop server client game
+      | isHost -> do
+          sendError clientHandle "Players not ready."
+          gameLoop server client game
+      | otherwise -> do
           sendError clientHandle "Only the host can start the game."
           gameLoop server client game
     GameInfo -> do
       sendEncoded clientHandle $ GameInfoAnswer (gameLis!game)
       gameLoop server client game
-    GameConfig{..} ->
-      if isHost
-        then
-          if gameConfPlayerNum >= (Map.size . gamePlayers) (gameLis!game)
-            then do
-              atomically $ writeTVar games
-                $ Map.adjust (updateGame gameConfMap gameConfMode gameConfPlayerNum) game gameLis
-              gameLoop server client game
-            else do
-              sendError clientHandle "Can't choose less Players."
-              gameLoop server client game
-        else do
+    GameConfig{..}
+      | isHost &&
+        gameConfPlayerNum >= (Map.size . gamePlayers) (gameLis!game)-> do
+          atomically $ do
+            gamesMap <- readTVar games
+            writeTVar games
+              $ Map.adjust (updateGame gameConfMap gameConfMode
+                            gameConfPlayerNum) game gamesMap
+          gameLoop server client game
+      | isHost -> do
+          sendError clientHandle "Can't choose less Players."
+          gameLoop server client game
+      | otherwise -> do
           sendError clientHandle "Unknown Message."
           inGameLoop server client game
     GameClosedByHost -> do
@@ -235,26 +233,22 @@ gameLoop server@Server{..} client@Client{..} game= do
       mainLoop server client
     GameLeave -> do
       leaveGame server client game
-      gameLoop server client game
+      mainLoop server client
     GameStartedByHost -> do
       sendMessage clientHandle "Game started..."
       inGameLoop server client game
     PlayerConfig{..} -> do
-      atomically $ writeTVar games
-        $ Map.adjust (updatePlayer clientName playerCiv playerTeam playerReady) game gameLis
+      atomically $ do
+        gamesMap <- readTVar games
+        writeTVar games
+          $ Map.adjust (updatePlayer clientName playerCiv playerTeam
+                        playerReady) game gamesMap
       gameLoop server client game
     Logout ->
       sendMessage clientHandle "You have been logged out."
     _ -> do
       sendError clientHandle "Unknown Message."
       gameLoop server client game
-
--- |Convert the clientmap with filter to the map format used in
--- GameStartAnswer
-convMap :: Map.Map AuthPlayerName Client -> [AuthPlayerName] ->
-           Map.Map AuthPlayerName HostName
-convMap inMap lis =
-  Map.map clientAddr (Map.filterWithKey (\k _ -> k `L.elem` lis) inMap)
 
 -- |Loop for Host in running Game
 inGameLoop :: Server -> Client -> GameName -> IO ()
@@ -273,13 +267,12 @@ inGameLoop server@Server{..} client@Client{..} game = do
     GameLeave -> do
       leaveGame server client game
       gameLoop server client game
-    GameOver ->
-      if isHost
-        then do
+    GameOver
+      | isHost -> do
           broadcastGame server game $ Broadcast "Game Over."
           leaveGame server client game
           inGameLoop server client game
-        else do
+      | otherwise -> do
           sendError clientHandle "Unknown Message."
           inGameLoop server client game
     Logout ->
@@ -297,11 +290,13 @@ joinGame Server{..} Client{..} gameId = do
       let Game{..} = gameLis!gameId
       if Map.size gamePlayers < numPlayers
         then do
-          clientLis <- readTVarIO clients
-          atomically $ writeTVar clients
-            $ Map.adjust (addClientInGame gameId) clientName clientLis
-          atomically $ writeTVar games
-            $ Map.adjust (joinPlayer clientName False) gameId gameLis
+          atomically $ do
+            gamesMap <- readTVar games
+            clientsMap <- readTVar clients
+            writeTVar clients
+              $ Map.adjust (addClientInGame gameId) clientName clientsMap
+            writeTVar games
+              $ Map.adjust (joinPlayer clientName False) gameId gamesMap
           sendMessage clientHandle "Joined Game."
           return True
         else do

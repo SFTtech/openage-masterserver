@@ -10,6 +10,7 @@ import Network
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
 import Data.Aeson
+import Data.List as L
 import Data.Text
 import Data.Map.Strict as Map
 import System.IO as S
@@ -133,3 +134,10 @@ broadcastGame Server{..} gameName msg = do
   gameLis <- readTVarIO games
   mapM_ (flip sendChannel msg . (!) clientLis . parName)
     $ gamePlayers $ gameLis!gameName
+
+-- |Convert the clientmap with filter to the map format used in
+-- GameStartAnswer
+convMap :: Map.Map AuthPlayerName Client -> [AuthPlayerName] ->
+           Map.Map AuthPlayerName HostName
+convMap inMap lis =
+  Map.map clientAddr (Map.filterWithKey (\k _ -> k `L.elem` lis) inMap)
