@@ -13,7 +13,7 @@ license:             AGPL-3
 license-file:        legal/AGPLv3
 author:              Jonas Jelten
 maintainer:          jj@sft.mx
-copyright:           2015, openage team
+copyright:           2016, openage team
 category:            Network, Game
 build-type:          Simple
 extra-source-files:  README.md
