@@ -34,15 +34,19 @@ Player
     deriving Show
 |]
 
-addPlayer :: Text -> BC.ByteString -> IO (Maybe (PO.Key Player))
+addPlayer :: Text                       -- ^ Players unique account-name
+          -> BC.ByteString              -- ^ Players salted password hash
+          -> IO (Maybe (PO.Key Player)) -- ^ Resulting Player
 addPlayer name pw =
   runPost $ PO.insertUnique $ Player name pw
 
-getPlayer :: Text -> IO(Maybe (PO.Entity Player))
+getPlayer :: Text                         -- ^ Players unique name
+          -> IO(Maybe (PO.Entity Player)) -- ^ Persist Entity for Player
 getPlayer pName =
   runPost $ PO.getBy $ UniqueUsername pName
 
-runPost :: SqlPersistT IO a -> IO a
+runPost :: SqlPersistT IO a -- ^ Database access action
+        -> IO a             -- ^ actions result
 runPost action = do
   conf <- getPostgresConf
   pool <- createPoolConfig conf
