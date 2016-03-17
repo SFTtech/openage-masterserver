@@ -98,12 +98,17 @@ checkAddClient handle server@Server{..} hostname = do
               sendChannel (clientMap!playerUsername) Logout
               atomically $ do
                 clientsMap <- readTVar clients
+                if member playerUsername clientsMap
+                   then retry
+                   else
+                     writeTVar clients
+                       $ Map.insert playerUsername client clientsMap
+              return $ Just client
+            else do
+              atomically $ do
+                clientsMap <- readTVar clients
                 writeTVar clients
                   $ Map.insert playerUsername client clientsMap
-              return $ Just client
-            else atomically $ do
-              writeTVar clients
-                $ Map.insert playerUsername client clientMap
               return $ Just client
         else return Nothing
         where
