@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 ------------------------------------------------------------------------------
@@ -17,14 +18,15 @@
 ------------------------------------------------------------------------------
 
 module Masterserver.Protocol
-       (InMessage(..),
-        OutMessage(..),
-        Game(..),
-        newGame,
-        AuthPlayerName,
-        GameName,
-        Participant(..),
-        newParticipant)
+       ( InMessage(..)
+       , OutMessage(..)
+       , Game(..)
+       , newGame
+       , AuthPlayerName
+       , GameName
+       , Participant(..)
+       , newParticipant
+       )
        where
 
 import Control.Concurrent.STM
@@ -35,73 +37,67 @@ import Data.Version
 import Network
 
 -- |Messages sent by Client
-data InMessage =
-  AddPlayer{
-    name :: Text,
-    pw :: Text
-  } |
-  Broadcast {content :: Text} |
-  ChatFromClient {chatFromCContent :: Text} |
-  ChatFromThread {
-    chatFromTOrign :: AuthPlayerName,
-    chatFromTContent :: Text
-  } |
-  Login {
-    loginName :: AuthPlayerName,
-    loginPassword :: Text
-  } |
-  Logout |
-  GameClosedByHost |
-  GameConfig {
-    gameConfMap :: Text,
-    gameConfMode :: Text,
-    gameConfPlayerNum :: Int
-  } |
-  GameInfo |
-  GameInit {
-    gameInitName :: GameName,
-    gameInitMap :: Text,
-    maxPlayers :: Int
-  } |
-  GameJoin {
-    gameId :: GameName
-  } |
-  GameLeave |
-  GameQuery |
-  GameOver  |
-  GameStart |
-  GameStartedByHost |
-  PlayerConfig {
-    playerCiv :: Text,
-    playerTeam :: Int,
-    playerReady :: Bool
-  } |
-  VersionMessage {
-    peerProtocolVersion :: Version
-  } deriving (Show, Read, Eq)
+data InMessage
+  = AddPlayer {name :: !Text, pw :: !Text}
+  | Broadcast {content :: !Text}
+  | ChatFromClient {chatFromCContent :: !Text}
+  | ChatFromThread
+    { chatFromTOrign :: !AuthPlayerName
+    , chatFromTContent :: !Text
+    }
+  | Login
+    { loginName :: !AuthPlayerName
+    , loginPassword :: !Text
+    }
+  | Logout
+  | GameClosedByHost
+  | GameConfig
+    { gameConfMap :: !Text
+    , gameConfMode :: !Text
+    , gameConfPlayerNum :: !Int
+    }
+  | GameInfo
+  | GameInit
+    { gameInitName :: !GameName
+    , gameInitMap :: !Text
+    , maxPlayers :: !Int
+    }
+  | GameJoin {gameId :: !GameName}
+  | GameLeave
+  | GameQuery
+  | GameOver
+  | GameStart
+  | GameStartedByHost
+  | PlayerConfig
+    { playerCiv :: !Text
+    , playerTeam :: !Int
+    , playerReady :: !Bool
+    }
+  | VersionMessage {peerProtocolVersion :: !Version}
+  deriving (Show, Read, Eq)
 
 -- |Messages sent by Server
-data OutMessage =
-  ChatOut {
-    chatOutOrigin :: AuthPlayerName,
-    chatOutContent :: Text
-  } |
-  GameStartAnswer {playerMap :: Map AuthPlayerName HostName} |
-  GameQueryAnswer {gameList :: [Game]} |
-  GameInfoAnswer {game :: Game} |
-  Error {errorString :: Text} |
-  Message {messageString :: Text}
+data OutMessage
+  = ChatOut
+    { chatOutOrigin :: !AuthPlayerName
+    , chatOutContent :: !Text
+    }
+  | GameStartAnswer {playerMap :: Map AuthPlayerName HostName}
+  | GameQueryAnswer {gameList :: ![Game]}
+  | GameInfoAnswer {game :: !Game}
+  | Error {errorString :: !Text}
+  | Message {messageString :: !Text}
   deriving Show
 
 -- |Game datatype
 -- It stores information about an open game
-data Game = Game {
-  gameHost :: AuthPlayerName,
-  gameName:: GameName,
-  gameMap :: Text,
-  gameMode :: Text,
-  numPlayers :: Int,
-  gamePlayers :: Map AuthPlayerName Participant
+data Game = Game
+  { gameHost :: !AuthPlayerName
+  , gameName:: !GameName
+  , gameMap :: !Text
+  , gameMode :: !Text
+  , numPlayers :: !Int
+  , gamePlayers :: Map AuthPlayerName Participant
   } deriving Show
 
 -- |Unique player account name
@@ -112,20 +108,20 @@ type GameName = Text
 
 newGame :: GameName -> AuthPlayerName -> Text -> Int -> STM Game
 newGame gameName gameHost gameMap numPlayers =
-  return Game {gamePlayers=Map.empty,
-               gameMode="Deathmatch", ..}
+  return Game { gamePlayers=Map.empty
+              , gameMode="Deathmatch", ..}
 
 -- |Game participant, players ingame settings
-data Participant = Participant {
-  parName :: AuthPlayerName,
-  parCiv :: Text,
-  parTeam :: Int,
-  parReady :: Bool
+data Participant = Participant
+  { parName :: !AuthPlayerName
+  , parCiv :: !Text
+  , parTeam :: !Int
+  , parReady :: !Bool
   } deriving Show
 
 newParticipant :: AuthPlayerName -> Bool -> Participant
-newParticipant parName parReady = Participant{parCiv="Britain",
-                                              parTeam=0, ..}
+newParticipant parName parReady = Participant{ parCiv="Britain"
+                                             , parTeam=0, ..}
 
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                                      ''Participant,
