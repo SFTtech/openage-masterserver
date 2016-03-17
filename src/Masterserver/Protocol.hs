@@ -38,7 +38,7 @@ import Data.Text(Text)
 import Data.Version
 import Network
 
--- |Messages sent by Client
+-- | Messages received by server
 data InMessage
   = AddPlayer {name :: !Text, pw :: !Text}
   | Broadcast {content :: !Text}

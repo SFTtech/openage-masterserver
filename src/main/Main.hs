@@ -60,7 +60,8 @@ talk handle server hostname = do
   case mayClient of
     Just client@Client{..} -> do
       sendMessage handle "Login success."
-      runClient server client `finally` removeClient server clientName
+      runClient server client
+        `finally` removeClientLeave server clientName
     Nothing ->
       sendError handle "Login failed."
 
@@ -87,42 +88,28 @@ checkAddClient handle server@Server{..} hostname = do
   loginJson <- B.hGetLine handle
   case (decode . BL.fromStrict) loginJson of
     Just Login{..} -> do
+      let toBs = BC.pack . T.unpack
       Just (Entity _ Player{..}) <- getPlayer loginName
       if validatePassword playerPassword (toBs loginPassword)
         then do
-          -- | TODO: atomical checkAdd function
           clientMap <- readTVarIO clients
           client <- newClient playerUsername hostname handle
           if member playerUsername clientMap
             then do
               sendChannel (clientMap!playerUsername) Logout
-              atomically $ do
-                clientsMap <- readTVar clients
-                if member playerUsername clientsMap
-                   then retry
-                   else
-                     writeTVar clients
-                       $ Map.insert playerUsername client clientsMap
+              atomically $ addClient server client
               return $ Just client
             else do
-              atomically $ do
-                clientsMap <- readTVar clients
-                writeTVar clients
-                  $ Map.insert playerUsername client clientsMap
+              atomically $ addClient server client
               return $ Just client
         else return Nothing
-        where
-          toBs = BC.pack . T.unpack
     Just AddPlayer{..} -> do
       hash <- hashPw pw
       res <- addPlayer name hash
-      case res of
-        Just _ -> do
-          sendMessage handle "Player successfully added."
-          checkAddClient handle server hostname
-        Nothing -> do
-          sendError handle "Name taken."
-          checkAddClient handle server hostname
+      maybe (sendError handle "Name taken."
+             >> checkAddClient handle server hostname)
+        (\_ -> sendMessage handle "Player successfully added."
+               >> checkAddClient handle server hostname) res
     _ -> do
       sendError handle "Unknown Format."
       return Nothing
@@ -133,9 +120,7 @@ hashPw :: Text             -- ^ Password sent by client
 hashPw pw = do
   let toBs = BC.pack . T.unpack
   mayHash <- hashPasswordUsingPolicy slowerBcryptHashingPolicy $ toBs pw
-  case mayHash of
-    Just hash -> return hash
-    Nothing -> error "Could not hash."
+  maybe (error "Hashing failed") return mayHash
 
 -- | Runs individual Client
 runClient :: Server -> Client -> IO ()
@@ -145,24 +130,8 @@ runClient server@Server{..} client@Client{..} = do
     where
       internalReceive = forever $ do
         msg <- B.hGetLine clientHandle
-        case (decode . BL.fromStrict) msg of
-          Just mess -> sendChannel client mess
-          Nothing -> sendError clientHandle "Could not read message."
-
--- | Remove Client from servers client map and close his games
-removeClient :: Server -> AuthPlayerName -> IO ()
-removeClient server@Server{..} clientName = do
-  clientLis <- readTVarIO clients
-  let client = clientLis!clientName
-  case clientInGame client of
-    Just game -> do
-      leaveGame server client game
-      cleanTvar
-    Nothing ->
-      cleanTvar
-  where
-    cleanTvar = atomically $
-      modifyTVar' clients $ Map.delete clientName
+        maybe (sendError clientHandle "Could not read message.")
+          (sendChannel client) $ (decode . BL.fromStrict) msg
 
 -- | Main Lobby loop with ClientMessage Handler functions
 mainLoop :: Server -> Client -> IO ()
@@ -182,7 +151,8 @@ mainLoop server@Server{..} client@Client{..} = do
           atomically $ writeTVar clients
             $ Map.adjust (addClientInGame gameName) clientName clientLis
           atomically $ writeTVar games
-            $ Map.adjust (joinPlayer clientName True) gameName gameLis
+            $ Map.adjust (addParticipant clientName
+                          True) gameName gameLis
           sendMessage clientHandle "Added game."
           gameLoop server client gameInitName
         Nothing -> do
@@ -308,50 +278,3 @@ inGameLoop server@Server{..} client@Client{..} game = do
       sendError clientHandle "Unknown Message."
       inGameLoop server client game
 
--- | Join Game and return True if join was successful
--- TODO: remove nested if-clauses
-joinGame :: Server -> Client -> GameName -> IO Bool
-joinGame Server{..} Client{..} gameId = do
-  gameLis <- readTVarIO games
-  if member gameId gameLis
-    then do
-      let Game{..} = gameLis!gameId
-      if Map.size gamePlayers < numPlayers
-        then do
-          atomically $ do
-            gamesMap <- readTVar games
-            clientsMap <- readTVar clients
-            writeTVar clients
-              $ Map.adjust (addClientInGame gameId) clientName clientsMap
-            writeTVar games
-              $ Map.adjust (joinPlayer clientName False) gameId gamesMap
-          sendMessage clientHandle "Joined Game."
-          return True
-        else do
-          sendError clientHandle "Game is full."
-          return False
-    else do
-      sendError clientHandle "Game does not exist."
-      return False
-
--- | Leave Game if normal player, close if host
-leaveGame :: Server -> Client -> GameName -> IO()
-leaveGame server@Server{..} client@Client{..} game = do
-      gameLis <- readTVarIO games
-      if clientName == gameHost (gameLis!game)
-        then do
-          clientLis <- readTVarIO clients
-          mapM_ (flip sendChannel GameClosedByHost
-                 . (!) clientLis. parName)
-            $ gamePlayers $ gameLis!game
-          atomically $ removeGame server game
-        else do
-          removeClientInGame server client
-          atomically $ do
-            gamesMap <- readTVar games
-            writeTVar games
-              $ Map.adjust leavePlayer game gamesMap
-          sendMessage clientHandle "Left Game."
-            where
-              leavePlayer gameOld@Game{..} =
-                gameOld {gamePlayers = Map.delete clientName gamePlayers}
