@@ -134,10 +134,10 @@ handleLobbyInput handle = do
 
 printInit :: IO ()
 printInit = do
-  printf "---------------------------------------------------------"
-  printf "- openage masterserver Testclient"
-  printf "- Type \"help\" for more information and \"exit\" to exit the client"
-  printf "---------------------------------------------------------"
+  printf "---------------------------------------------------------\n"
+  printf "- openage masterserver Testclient\n"
+  printf "- Type \"help\" for more information and \"exit\" to exit the client\n"
+  printf "---------------------------------------------------------\n"
 
 printCommands :: IO ()
 printCommands = do
