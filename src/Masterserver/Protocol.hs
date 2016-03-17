@@ -23,7 +23,6 @@ module Masterserver.Protocol
         newGame,
         AuthPlayerName,
         GameName,
-        GameStat,
         Participant(..),
         newParticipant)
        where
@@ -102,8 +101,7 @@ data Game = Game {
   gameMap :: Text,
   gameMode :: Text,
   numPlayers :: Int,
-  gamePlayers :: Map AuthPlayerName Participant,
-  gameState :: GameStat
+  gamePlayers :: Map AuthPlayerName Participant
   } deriving Show
 
 -- |Unique player account name
@@ -112,14 +110,9 @@ type AuthPlayerName = Text
 -- |Unique game name
 type GameName = Text
 
--- |Game Status
-data GameStat = Lobby | Running | Aborted | Finished
-  deriving (Show, Read, Eq)
-
 newGame :: GameName -> AuthPlayerName -> Text -> Int -> STM Game
 newGame gameName gameHost gameMap numPlayers =
-  return Game {gameState=Lobby,
-               gamePlayers=Map.empty,
+  return Game {gamePlayers=Map.empty,
                gameMode="Deathmatch", ..}
 
 -- |Game participant, players ingame settings
@@ -137,6 +130,5 @@ newParticipant parName parReady = Participant{parCiv="Britain",
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                                      ''Participant,
                                                      ''Game,
-                                                     ''GameStat,
                                                      ''OutMessage,
                                                      ''Version]

@@ -15,11 +15,9 @@ module Masterserver.Config (
   )where
 
 import Prelude hiding (concat, lookup, putStrLn)
-import Control.Concurrent
 import Data.Aeson.TH
 import Data.Yaml
 import Database.Persist.Postgresql
-import Text.Printf
 
 data Config = Config {
   acceptedVersion :: [Int],
@@ -34,20 +32,6 @@ getPostgresConf = do
   Just yaml <- decodeFile "etc/openage/masterserver.yaml"
   conf <- parseMonad loadConfig $ database yaml
   applyEnv (conf :: PostgresConf)
-
---loadCfgStr :: Config -> IO ByteString
---loadCfgStr config = do
---  host <- require config "database.host"
---  dbname <- require config "database.dbname"
---  user <- require config "database.user"
---  password <- require config "database.password"
---  port <- require config "database.port"
---  return $ concat ["host=", host,
---                   " dbname=", dbname,
---                   " user=", user,
---                   " password=", password,
---                   " port=", port]
---
 
 getPort :: IO Int
 getPort = do

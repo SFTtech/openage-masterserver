@@ -97,8 +97,8 @@ checkAddGame Server{..} pName (GameInit gName gMap gPlay) =
 checkAddGame _ _ _ = return Nothing
 
 updateGame :: Text -> Text -> Int -> Game -> Game
-updateGame map mode num game =
-  game {gameMap=map, gameMode=mode, numPlayers=num}
+updateGame gMap mode num game =
+  game {gameMap=gMap, gameMode=mode, numPlayers=num}
 
 -- |Remove Game from servers game map
 removeGame :: Server -> GameName -> IO ()

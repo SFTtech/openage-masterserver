@@ -23,8 +23,6 @@ import Database.Persist
 import Database.Persist.Postgresql as PO
 import Database.Persist.TH
 import Data.Text
-import Control.Monad.Logger
-import Control.Monad.IO.Class
 
 import Masterserver.Config
 
@@ -44,6 +42,7 @@ getPlayer :: Text -> IO(Maybe (PO.Entity Player))
 getPlayer pName =
   runPost $ PO.getBy $ UniqueUsername pName
 
+runPost :: SqlPersistT IO a -> IO a
 runPost action = do
   conf <- getPostgresConf
   pool <- createPoolConfig conf
