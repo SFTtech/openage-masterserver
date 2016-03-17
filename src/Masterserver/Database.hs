@@ -19,7 +19,7 @@
 module Masterserver.Database where
 
 import Data.ByteString.Char8 as BC
-import Database.Persist as P
+import Database.Persist
 import Database.Persist.Postgresql as PO
 import Database.Persist.TH
 import Data.Text
@@ -36,23 +36,15 @@ Player
     deriving Show
 |]
 
-addPlayer :: Text -> BC.ByteString -> IO (Maybe (Key Player))
-addPlayer name pw = do
-  (con, _)<- loadConf
-  conStr <- loadCfgStr con
-  runPost conStr $ insertUnique $ Player name pw
+addPlayer :: Text -> BC.ByteString -> IO (Maybe (PO.Key Player))
+addPlayer name pw =
+  runPost $ PO.insertUnique $ Player name pw
 
-getPlayer :: Text -> IO(Maybe (Entity Player))
-getPlayer pName = do
-  (con, _)<- loadConf
-  conStr <- loadCfgStr con
-  runPost conStr $ getBy $ UniqueUsername pName
+getPlayer :: Text -> IO(Maybe (PO.Entity Player))
+getPlayer pName =
+  runPost $ PO.getBy $ UniqueUsername pName
 
-runPost conStr action = runNoLoggingT $ withPostgresqlPool conStr 10
-  $ \pool -> liftIO $ flip runSqlPersistMPool pool $ do
-    runMigration migrateAll
-    action
-
-runMig conStr = runNoLoggingT $ withPostgresqlPool conStr 10
-  $ \pool -> liftIO $ flip runSqlPersistMPool pool $
-    runMigration migrateAll
+runPost action = do
+  conf <- getPostgresConf
+  pool <- createPoolConfig conf
+  PO.runPool conf action pool

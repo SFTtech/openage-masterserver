@@ -41,8 +41,7 @@ import Masterserver.Server
 
 main :: IO ()
 main = withSocketsDo $ do
-  (conf, _) <- loadConf
-  port <- getPort conf
+  port <- getPort
   server <- newServer
   sock <- listenOn (PortNumber (fromIntegral port))
   printf "Listening on port %d\n" port
@@ -69,8 +68,7 @@ talk handle server hostname = do
 checkVersion :: S.Handle -> IO ()
 checkVersion handle = do
   verJson <- B.hGetLine handle
-  (conf, _) <- loadConf
-  myVersion <- getVersion conf
+  myVersion <- getVersion
   if (peerProtocolVersion .
       fromJust .
       decode .
@@ -272,6 +270,14 @@ inGameLoop server@Server{..} client@Client{..} game = do
   case msg of
     Broadcast{..} -> do
       sendMessage clientHandle content
+      inGameLoop server client game
+    ChatFromClient{..} -> do
+      broadcastGame server game
+        $ ChatFromThread clientName chatFromCContent
+      inGameLoop server client game
+    ChatFromThread{..} -> do
+      sendEncoded clientHandle
+        $ ChatOut chatFromTOrign chatFromTContent
       inGameLoop server client game
     GameClosedByHost -> do
       removeClientInGame server client
