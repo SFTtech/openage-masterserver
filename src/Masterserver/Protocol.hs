@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE RecordWildCards #-}
+-- | Better performance for strict records
 {-# OPTIONS_GHC -funbox-strict-fields #-}
+-- | Ignore orphaned instances for Version aeson instances
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 ------------------------------------------------------------------------------

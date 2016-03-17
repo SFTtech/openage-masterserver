@@ -162,11 +162,11 @@ mainLoop server@Server{..} client@Client{..} = do
   msg <- atomically $ readTChan clientChan
   case msg of
     GameQuery -> do
-      gameLis <- getGameList server
+      gameLis <- atomically $ getGameList server
       sendGameQueryAnswer clientHandle gameLis
       mainLoop server client
     GameInit{..} -> do
-      maybeGame <- checkAddGame server clientName msg
+      maybeGame <- atomically $ checkAddGame server clientName msg
       case maybeGame of
         Just Game{..} -> do
           gameLis <- readTVarIO games
@@ -326,6 +326,7 @@ joinGame Server{..} Client{..} gameId = do
       return False
 
 -- |Leave Game if normal player, close if host
+-- TODO: remove nested if-clauses
 leaveGame :: Server -> Client -> GameName -> IO()
 leaveGame server@Server{..} client@Client{..} game = do
       gameLis <- readTVarIO games
@@ -335,11 +336,13 @@ leaveGame server@Server{..} client@Client{..} game = do
           mapM_ (flip sendChannel GameClosedByHost
                  . (!) clientLis. parName)
             $ gamePlayers $ gameLis!game
-          removeGame server game
+          atomically $ removeGame server game
         else do
           removeClientInGame server client
-          atomically $ writeTVar games
-            $ Map.adjust leavePlayer game gameLis
+          atomically $ do
+            gamesMap <- readTVar games
+            writeTVar games
+              $ Map.adjust leavePlayer game gamesMap
           sendMessage clientHandle "Left Game."
             where
               leavePlayer gameOld@Game{..} =

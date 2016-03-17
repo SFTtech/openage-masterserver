@@ -20,9 +20,9 @@ import Database.Persist.Postgresql
 
 -- | Config datatype used for parsing.
 data Config = Config
-  { acceptedVersion :: [Int] -- ^ Client version accepted by server
-  , port :: Int              -- ^ Port to run server on
-  , database :: Value        -- ^ Database connection info
+  { acceptedVersion :: ![Int] -- ^ Client version accepted by server
+  , port :: !Int              -- ^ Port to run server on
+  , database :: !Value        -- ^ Database connection info
   } deriving Show
 
 -- | Derives aeson toJSON and fromJSON instances for Config.
