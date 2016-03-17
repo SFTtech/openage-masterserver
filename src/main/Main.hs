@@ -64,15 +64,15 @@ talk handle server hostname = do
     Nothing ->
       sendError handle "Login failed."
 
--- |Compare Version to own
+-- | Compare Version to own
 checkVersion :: S.Handle -> IO ()
 checkVersion handle = do
   verJson <- B.hGetLine handle
   myVersion <- getVersion
-  if (peerProtocolVersion .
-      fromJust .
-      decode .
-      BL.fromStrict) verJson == makeVersion myVersion
+  if ( peerProtocolVersion
+     . fromJust
+     . decode
+     . BL.fromStrict) verJson == makeVersion myVersion
     then
       sendMessage handle "Version accepted."
     else do
@@ -80,7 +80,7 @@ checkVersion handle = do
       thread <- myThreadId
       killThread thread
 
--- |Get login credentials from handle, add client to servers
+-- | Get login credentials from handle, add client to servers
 -- clientmap and return Client
 checkAddClient :: Handle -> Server -> HostName -> IO(Maybe Client)
 checkAddClient handle server@Server{..} hostname = do
@@ -90,13 +90,16 @@ checkAddClient handle server@Server{..} hostname = do
       Just (Entity _ Player{..}) <- getPlayer loginName
       if validatePassword playerPassword (toBs loginPassword)
         then do
+          -- | TODO: atomical checkAdd function
           clientMap <- readTVarIO clients
           client <- newClient playerUsername hostname handle
           if member playerUsername clientMap
             then do
               sendChannel (clientMap!playerUsername) Logout
-              atomically $ writeTVar clients
-                $ Map.insert playerUsername client clientMap
+              atomically $ do
+                clientsMap <- readTVar clients
+                writeTVar clients
+                  $ Map.insert playerUsername client clientsMap
               return $ Just client
             else atomically $ do
               writeTVar clients
@@ -119,17 +122,17 @@ checkAddClient handle server@Server{..} hostname = do
       sendError handle "Unknown Format."
       return Nothing
 
--- |Uses BCrypt to hash pw before writing it to db
-hashPw :: Text -> IO BC.ByteString
+-- | Uses BCrypt to hash pw before writing it to db
+hashPw :: Text             -- ^ Password sent by client
+       -> IO BC.ByteString -- ^ salted password hash
 hashPw pw = do
+  let toBs = BC.pack . T.unpack
   mayHash <- hashPasswordUsingPolicy slowerBcryptHashingPolicy $ toBs pw
   case mayHash of
     Just hash -> return hash
     Nothing -> error "Could not hash."
-  where
-    toBs = BC.pack . T.unpack
 
--- |Runs individual Client
+-- | Runs individual Client
 runClient :: Server -> Client -> IO ()
 runClient server@Server{..} client@Client{..} = do
   _ <- race internalReceive $ mainLoop server client
@@ -141,7 +144,7 @@ runClient server@Server{..} client@Client{..} = do
           Just mess -> sendChannel client mess
           Nothing -> sendError clientHandle "Could not read message."
 
--- |Remove Client from servers client map and close his games
+-- | Remove Client from servers client map and close his games
 removeClient :: Server -> AuthPlayerName -> IO ()
 removeClient server@Server{..} clientName = do
   clientLis <- readTVarIO clients
@@ -156,7 +159,7 @@ removeClient server@Server{..} clientName = do
     cleanTvar = atomically $
       modifyTVar' clients $ Map.delete clientName
 
--- |Main Lobby loop with ClientMessage Handler functions
+-- | Main Lobby loop with ClientMessage Handler functions
 mainLoop :: Server -> Client -> IO ()
 mainLoop server@Server{..} client@Client{..} = do
   msg <- atomically $ readTChan clientChan
@@ -191,7 +194,7 @@ mainLoop server@Server{..} client@Client{..} = do
       sendError clientHandle "Unknown Message."
       mainLoop server client
 
--- |Gamestate loop
+-- | Gamestate loop
 gameLoop :: Server -> Client -> GameName -> IO ()
 gameLoop server@Server{..} client@Client{..} game= do
   msg <- atomically $ readTChan clientChan
@@ -261,7 +264,7 @@ gameLoop server@Server{..} client@Client{..} game= do
       sendError clientHandle "Unknown Message."
       gameLoop server client game
 
--- |Loop for Host in running Game
+-- | Loop for Host in running Game
 inGameLoop :: Server -> Client -> GameName -> IO ()
 inGameLoop server@Server{..} client@Client{..} game = do
   msg <- atomically $ readTChan clientChan
@@ -300,7 +303,8 @@ inGameLoop server@Server{..} client@Client{..} game = do
       sendError clientHandle "Unknown Message."
       inGameLoop server client game
 
--- |Join Game and return True if join was successful
+-- | Join Game and return True if join was successful
+-- TODO: remove nested if-clauses
 joinGame :: Server -> Client -> GameName -> IO Bool
 joinGame Server{..} Client{..} gameId = do
   gameLis <- readTVarIO games
@@ -325,8 +329,7 @@ joinGame Server{..} Client{..} gameId = do
       sendError clientHandle "Game does not exist."
       return False
 
--- |Leave Game if normal player, close if host
--- TODO: remove nested if-clauses
+-- | Leave Game if normal player, close if host
 leaveGame :: Server -> Client -> GameName -> IO()
 leaveGame server@Server{..} client@Client{..} game = do
       gameLis <- readTVarIO games
