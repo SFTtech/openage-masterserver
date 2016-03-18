@@ -16,6 +16,7 @@
 module Masterserver.Server where
 
 import Control.Concurrent.STM
+import Control.Monad
 import Data.Aeson
 import Data.ByteString.Char8 as BC
 import Data.ByteString.Lazy as BL
@@ -106,8 +107,8 @@ checkAddGame _ _ _ = return Nothing
 
 -- | Remove Game from servers game map
 removeGame :: Server -> GameName -> STM ()
-removeGame Server{..} name =
-  modifyTVar' games $ Map.delete name
+removeGame Server{..} game =
+  modifyTVar' games $ Map.delete game
 
 -- | Add client to servers clients map
 addClient :: Server -> Client -> STM ()
@@ -122,8 +123,67 @@ removeClientLeave :: Server -> AuthPlayerName -> IO ()
 removeClientLeave server@Server{..} cliName = do
   clientsMap <- readTVarIO clients
   let client@Client{..} = clientsMap!cliName
-  maybe (return ()) (leaveGame server client) clientInGame
+  maybe (return ()) (gameLeaveHandler server client) clientInGame
   atomically $ modifyTVar' clients $ Map.delete clientName
+
+-- | Add game to Host and Participant to games map of players
+joinGame :: Server         -- ^ Global server containing Maps
+         -> AuthPlayerName -- ^ This Clients name
+         -> GameName       -- ^ Name of game to join
+         -> Bool           -- ^ True if ready
+         -> STM ()
+joinGame Server{..} clientName gameName rdy= do
+  gamesMap <- readTVar games
+  clientsMap <- readTVar clients
+  writeTVar clients
+    $ Map.adjust (addClientInGame gameName) clientName clientsMap
+  writeTVar games
+    $ Map.adjust (addParticipant clientName
+                  rdy) gameName gamesMap
+
+-- | Delete clientName from game and gameName from client in Maps
+leaveGame :: Server         -- ^ Global server containing Maps
+          -> AuthPlayerName -- ^ This Clients name
+          -> GameName       -- ^ Name of game to leave
+          -> STM ()
+leaveGame Server{..} clientName game = do
+  let leavePlayer gameOld@Game{..} =
+        gameOld {gamePlayers = Map.delete clientName gamePlayers}
+  clientsMap <- readTVar clients
+  gamesMap <- readTVar games
+  writeTVar clients $ Map.adjust removeClientInGame clientName clientsMap
+  when (member game gamesMap) $
+    writeTVar games $ Map.adjust leavePlayer game gamesMap
+
+-- | Leave Game if normal player, close if host
+gameLeaveHandler :: Server -> Client -> GameName -> IO()
+gameLeaveHandler server@Server{..} Client{..} game = do
+      gameLis <- readTVarIO games
+      if clientName == gameHost (gameLis!game)
+        then do
+          broadcastGame server game GameClosedByHost
+          atomically $ removeGame server game
+        else do
+          atomically $ leaveGame server clientName game
+          sendMessage clientHandle "Left Game."
+
+-- | Add Game to Clients clientInGame field
+addClientInGame :: GameName -> Client -> Client
+addClientInGame game client@Client{..} =
+  client {clientInGame = Just game}
+
+-- | Remove Game from clientsInGame field
+removeClientInGame :: Client -> Client
+removeClientInGame cli = cli {clientInGame = Nothing}
+
+-- | Add participant to game
+addParticipant :: AuthPlayerName -- ^ Players name
+           -> Bool               -- ^ True if player is host
+           -> Game               -- ^ Game to update
+           -> Game               -- ^ Resulting game
+addParticipant name host game@Game{..} =
+  game {gamePlayers = Map.insert name
+        (newParticipant name host) gamePlayers}
 
 -- | Update game with given map, mode and player number
 updateGame :: Text -- ^ Games map name
@@ -133,61 +193,6 @@ updateGame :: Text -- ^ Games map name
            -> Game -- ^ Resulting game
 updateGame gMap mode num game =
   game {gameMap=gMap, gameMode=mode, numPlayers=num}
-
--- | Add participant to game
-addParticipant :: AuthPlayerName -- ^ Players name
-           -> Bool           -- ^ True if player is host
-           -> Game           -- ^ Game to update
-           -> Game           -- ^ Resulting game
-addParticipant name host game@Game{..} =
-  game {gamePlayers = Map.insert name
-        (newParticipant name host) gamePlayers}
-
--- | Join Game and return True if join was successful
-joinGame :: Server -> Client -> GameName -> IO Bool
-joinGame Server{..} Client{..} game = do
-  gameLis <- readTVarIO games
-  case member game gameLis of
-    True
-      | Game{..} <- gameLis!game
-      , Map.size gamePlayers < numPlayers -> do
-          atomically $ do
-            gamesMap <- readTVar games
-            clientsMap <- readTVar clients
-            writeTVar clients
-              $ Map.adjust (addClientInGame game) clientName clientsMap
-            writeTVar games
-              $ Map.adjust (addParticipant clientName False) game gamesMap
-          sendMessage clientHandle "Joined Game."
-          return True
-      | otherwise -> do
-          sendError clientHandle "Game is full."
-          return False
-    _ -> do
-      sendError clientHandle "Game does not exist."
-      return False
-
--- | Leave Game if normal player, close if host
-leaveGame :: Server -> Client -> GameName -> IO()
-leaveGame server@Server{..} client@Client{..} game = do
-      gameLis <- readTVarIO games
-      if clientName == gameHost (gameLis!game)
-        then do
-          clientLis <- readTVarIO clients
-          mapM_ (flip sendChannel GameClosedByHost
-                 . (!) clientLis . parName)
-            $ gamePlayers $ gameLis!game
-          atomically $ removeGame server game
-        else do
-          removeClientInGame server client
-          atomically $ do
-            gamesMap <- readTVar games
-            writeTVar games
-              $ Map.adjust leavePlayer game gamesMap
-          sendMessage clientHandle "Left Game."
-            where
-              leavePlayer gameOld@Game{..} =
-                gameOld {gamePlayers = Map.delete clientName gamePlayers}
 
 -- | Updates player configuration
 updatePlayer :: AuthPlayerName -- ^ Players name
@@ -203,20 +208,6 @@ updatePlayer name civ team rdy game@Game{..} =
                         , parCiv = civ
                         , parTeam=team
                         , parReady=rdy}
-
--- | Add Game to Clients clientInGame field
-addClientInGame :: GameName -> Client -> Client
-addClientInGame game client@Client{..} =
-  client {clientInGame = Just game}
-
--- | Remove ClientInGame from client in servers clientmap
-removeClientInGame :: Server -> Client -> IO ()
-removeClientInGame Server{..} Client{..} = do
-  clientLis <- readTVarIO clients
-  atomically $ writeTVar clients
-    $ Map.adjust rmClientGame clientName clientLis
-    where
-      rmClientGame cli = cli {clientInGame = Nothing}
 
 -- | Broadcast message to all Clients in a Game
 broadcastGame :: Server -> GameName -> InMessage -> IO ()

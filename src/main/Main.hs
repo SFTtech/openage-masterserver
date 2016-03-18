@@ -143,26 +143,32 @@ mainLoop server@Server{..} client@Client{..} = do
       sendGameQueryAnswer clientHandle gameLis
       mainLoop server client
     GameInit{..} -> do
+      -- | check if name not taken, return game if successful
       maybeGame <- atomically $ checkAddGame server clientName msg
-      case maybeGame of
-        Just Game{..} -> do
-          gameLis <- readTVarIO games
-          clientLis <- readTVarIO clients
-          atomically $ writeTVar clients
-            $ Map.adjust (addClientInGame gameName) clientName clientLis
-          atomically $ writeTVar games
-            $ Map.adjust (addParticipant clientName
-                          True) gameName gameLis
-          sendMessage clientHandle "Added game."
-          gameLoop server client gameInitName
-        Nothing -> do
-          sendError clientHandle "Failed adding game."
-          mainLoop server client
+      maybe
+        -- | send Error and return to mainLoop if failed
+        (sendError clientHandle "Failed adding game."
+             >> mainLoop server client)
+        -- | Add game to client, client to game and go to gameLoop
+        (\ Game{..} ->
+          atomically (joinGame server clientName gameName True)
+          >> sendMessage clientHandle "Added game."
+          >> gameLoop server client gameInitName) maybeGame
     GameJoin{..} -> do
-      success <- joinGame server client gameId
-      if success
-        then gameLoop server client gameId
-        else mainLoop server client
+      gameLis <- readTVarIO games
+      case member gameId gameLis of
+        True
+          | Game{..} <- gameLis!gameId
+          , Map.size gamePlayers < numPlayers -> do
+              atomically $ joinGame server clientName gameId False
+              sendMessage clientHandle "Joined Game."
+              gameLoop server client gameName
+          | otherwise -> do
+              sendError clientHandle "Game is full."
+              mainLoop server client
+        _ -> do
+          sendError clientHandle "Game does not exist."
+          mainLoop server client
     Logout ->
       sendMessage clientHandle "You have been logged out."
     _ -> do
@@ -217,12 +223,12 @@ gameLoop server@Server{..} client@Client{..} game= do
           sendError clientHandle "Unknown Message."
           inGameLoop server client game
     GameClosedByHost -> do
-      removeClientInGame server client
+      atomically $ leaveGame server clientName game
       sendMessage clientHandle "Game was closed by Host."
       mainLoop server client
     GameLeave -> do
-      leaveGame server client game
-      mainLoop server client
+      gameLeaveHandler server client game
+      gameLoop server client game
     GameStartedByHost -> do
       sendMessage clientHandle "Game started..."
       inGameLoop server client game
@@ -258,16 +264,16 @@ inGameLoop server@Server{..} client@Client{..} game = do
         $ ChatOut chatFromTOrign chatFromTContent
       inGameLoop server client game
     GameClosedByHost -> do
-      removeClientInGame server client
+      atomically $ leaveGame server clientName game
       sendMessage clientHandle "Game was closed by Host."
       mainLoop server client
     GameLeave -> do
-      leaveGame server client game
+      gameLeaveHandler server client game
       gameLoop server client game
     GameOver
       | isHost -> do
           broadcastGame server game $ Broadcast "Game Over."
-          leaveGame server client game
+          gameLeaveHandler server client game
           inGameLoop server client game
       | otherwise -> do
           sendError clientHandle "Unknown Message."
