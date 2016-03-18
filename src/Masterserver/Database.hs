@@ -34,17 +34,20 @@ Player
     deriving Show
 |]
 
+-- | Add Player to table player
 addPlayer :: Text                       -- ^ Players unique account-name
           -> BC.ByteString              -- ^ Players salted password hash
           -> IO (Maybe (PO.Key Player)) -- ^ Resulting Player
 addPlayer name pw =
   runPost $ PO.insertUnique $ Player name pw
 
+-- | Get Player by name
 getPlayer :: Text                         -- ^ Players unique name
           -> IO(Maybe (PO.Entity Player)) -- ^ Persist Entity for Player
 getPlayer pName =
   runPost $ PO.getBy $ UniqueUsername pName
 
+-- | Run a persist transaction with config credentials
 runPost :: SqlPersistT IO a -- ^ Database access action
         -> IO a             -- ^ actions result
 runPost action = do

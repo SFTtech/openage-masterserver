@@ -78,7 +78,7 @@ data InMessage
   | VersionMessage {peerProtocolVersion :: !Version}
   deriving (Show, Read, Eq)
 
--- |Messages sent by Server
+-- | Messages sent by Server
 data OutMessage
   = ChatOut
     { chatOutOrigin :: !AuthPlayerName
@@ -91,7 +91,7 @@ data OutMessage
   | Message {messageString :: !Text}
   deriving Show
 
--- |Game datatype
+-- | Game datatype
 -- It stores information about an open game
 data Game = Game
   { gameHost :: !AuthPlayerName
@@ -102,10 +102,10 @@ data Game = Game
   , gamePlayers :: Map AuthPlayerName Participant
   } deriving Show
 
--- |Unique player account name
+-- | Unique player account name
 type AuthPlayerName = Text
 
--- |Unique game name
+-- | Unique game name
 type GameName = Text
 
 newGame :: GameName -> AuthPlayerName -> Text -> Int -> STM Game
@@ -113,7 +113,7 @@ newGame gameName gameHost gameMap numPlayers =
   return Game { gamePlayers=Map.empty
               , gameMode="Deathmatch", ..}
 
--- |Game participant, players ingame settings
+-- | Game participant, players ingame settings
 data Participant = Participant
   { parName :: !AuthPlayerName
   , parCiv :: !Text
