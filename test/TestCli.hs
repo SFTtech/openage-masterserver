@@ -42,7 +42,7 @@ main = withSocketsDo $ do
       getSendCredentials handle
       mainLoop handle
     _ -> do
-      T.putStrLn "Please provide host and port"
+      printf "Please provide host and port"
       return ()
 
 handleVersion :: Handle -> IO ()
@@ -81,7 +81,7 @@ handleAnswer handle = do
     Just GameStartAnswer{..} -> printFormattedGameStart playerMap
     Just ChatOut{..} ->
       printf "%s: %s\n" chatOutOrigin chatOutContent
-    _ -> T.putStrLn "Error: Decoding error."
+    _ -> printf "Error: Decoding error."
 
 mainLoop :: Handle -> IO ()
 mainLoop handle = do
@@ -181,7 +181,7 @@ printFormattedPart Participant{..} =
 
 printFormattedGames :: [Game] -> IO ()
 printFormattedGames games = do
-  T.putStr "Title\tMap\tPlayers\tHost\n"
+  printf "Title\tMap\tPlayers\tHost\n"
   mapM_ printGame games
     where
       printGame Game{..} =

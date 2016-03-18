@@ -20,7 +20,7 @@ extra-source-files:  README.md
 cabal-version:       >=1.10
 
 library
-  ghc-options:         -O2 -Wall -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  ghc-options:         -O2 -Wall -Werror -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   hs-source-dirs:      src
   exposed-modules:     Masterserver.Protocol
                      , Masterserver.Config
@@ -46,7 +46,7 @@ library
   default-language:    Haskell2010
 
 executable openage-masterserver
-  ghc-options:         -O2 -Wall -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  ghc-options:         -O2 -Wall -Werror -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   hs-source-dirs:      src/main/
   main-is:             Main.hs
   build-depends:       base >=4.7
@@ -65,7 +65,7 @@ executable openage-masterserver
 executable openage-masterserver-test
   hs-source-dirs:      test/
   main-is:             TestCli.hs
-  ghc-options:         -O2 -Wall -dynamic -threaded -rtsopts -with-rtsopts=-N -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  ghc-options:         -O2 -Wall -Werror -dynamic -threaded -rtsopts -with-rtsopts=-N -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   build-depends:       base
                      , openage-masterserver
                      , async >= 2.1
