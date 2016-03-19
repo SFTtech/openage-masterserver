@@ -5,9 +5,9 @@ acceptedVersion: [1,0,0]
 port: 1234
 # Database connection information
 database:
-  host: localhost
-  database: masterserver
-  password: test1
-  user: postgres
+  host: <host>
+  database: <database>
+  password: <pass>
+  user: <dbuser>
   port: 5432
   poolsize: 10
