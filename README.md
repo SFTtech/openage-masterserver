@@ -28,7 +28,19 @@ How do I run this thing?
 You probably don't want to run it except for development:
 To have one "official" community, this server is provided by sft.
 
-Currently, no component is functional, but soon™ you may see progress.
+The openage masterserver uses the haskell tool stack to build and
+install.
+Executables can be built using `stack build`.
+
+The server can be started by running `stack exec openage-masterserver`.
+The port it is listening on and the database login credentials are
+specified in the config file /etc/openage/masterserver.cfg.
+
+To start a testclient use
+`stack exec openage-masterserver-test HOST PORT`
+You will be promted to enter login credentials which need to be stored
+in the postgres database.
+To view all available commands type `help`.
 
 
 Can I help?

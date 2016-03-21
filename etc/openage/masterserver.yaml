@@ -1,0 +1,13 @@
+# Client version accepted by server where [1,0,0] stands for
+# version 1.0.0
+acceptedVersion: [1,0,0]
+# Port server is running on
+port: 1234
+# Database connection information
+database:
+  host: <host>
+  database: <database>
+  password: <pass>
+  user: <dbuser>
+  port: 5432
+  poolsize: 10

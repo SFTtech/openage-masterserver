@@ -13,28 +13,78 @@ license:             AGPL-3
 license-file:        legal/AGPLv3
 author:              Jonas Jelten
 maintainer:          jj@sft.mx
-copyright:           2015, openage team
+copyright:           2016, openage team
 category:            Network, Game
 build-type:          Simple
 extra-source-files:  README.md
 cabal-version:       >=1.10
 
-executable openage-masterserver
-  ghc-options:         -O2 -Wall -dynamic -threaded -fno-warn-missing-signatures -fwarn-tabs
+library
+  ghc-options:         -O2 -Wall -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   hs-source-dirs:      src
-  main-is:             Main.hs
+  exposed-modules:     Masterserver.Protocol
+                     , Masterserver.Config
+                     , Masterserver.Database
+                     , Masterserver.Server
+  build-depends:       base >= 4.7 && < 5
+                     , async >= 2.1
+                     , aeson
+                     , containers >= 0.5
+                     , text
+                     , bytestring >= 0.10
+                     , persistent
+                     , persistent-postgresql >= 2.2
+                     , persistent-template >= 2.1
+                     , transformers >= 0.4
+                     , configurator
+                     , mtl
+                     , stm >= 2.4
+                     , monad-logger >= 0.3
+                     , network >= 2.6
+                     , scrypt >= 0.5
+                     , yaml >= 0.8
   default-language:    Haskell2010
-  build-depends:
-    base >=4.7,
-    HDBC,
-    HDBC-postgresql,
-    aeson,
-    bytestring,
-    containers,
-    network,
-    parsec,
-    utf8-string,
-    text
+
+executable openage-masterserver
+  ghc-options:         -O2 -Wall -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  hs-source-dirs:      src/main/
+  main-is:             Main.hs
+  build-depends:       base >=4.7
+                     , aeson
+                     , async >= 2.1
+                     , bcrypt
+                     , bytestring >= 0.10
+                     , containers >= 0.5
+                     , network >= 2.6
+                     , persistent
+                     , stm >= 2.4
+                     , text
+                     , openage-masterserver
+  default-language:    Haskell2010
+
+executable openage-masterserver-test
+  hs-source-dirs:      test/
+  main-is:             TestCli.hs
+  ghc-options:         -O2 -Wall -dynamic -threaded -rtsopts -with-rtsopts=-N -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
+  build-depends:       base
+                     , openage-masterserver
+                     , async >= 2.1
+                     , aeson
+                     , containers >= 0.5
+                     , text
+                     , bytestring >= 0.10
+                     , persistent
+                     , persistent-postgresql >= 2.2
+                     , persistent-template >= 2.1
+                     , transformers >= 0.4
+                     , configurator
+                     , mtl
+                     , keys
+                     , stm >= 2.4
+                     , monad-logger >= 0.3
+                     , network >= 2.6
+                     , scrypt >= 0.5
+  default-language:    Haskell2010
 
 source-repository head
   type: git
