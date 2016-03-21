@@ -111,7 +111,7 @@ type GameName = Text
 newGame :: GameName -> AuthPlayerName -> Text -> Int -> STM Game
 newGame gameName gameHost gameMap numPlayers =
   return Game { gamePlayers=Map.empty
-              , gameMode="Deathmatch", ..}
+              , gameMode="None", ..}
 
 -- | Game participant, players ingame settings
 data Participant = Participant
@@ -122,7 +122,7 @@ data Participant = Participant
   } deriving Show
 
 newParticipant :: AuthPlayerName -> Bool -> Participant
-newParticipant parName parReady = Participant{ parCiv="Britain"
+newParticipant parName parReady = Participant{ parCiv="None"
                                              , parTeam=0, ..}
 
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
