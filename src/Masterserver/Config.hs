@@ -9,41 +9,27 @@
 
 ------------------------------------------------------------------------------
 module Masterserver.Config
-       ( getPostgresConf
-       , getPort
-       , getVersion
+       ( Config(..)
+       , loadConf
        ) where
 
 import Data.Aeson.TH
-import Data.Yaml
 import Database.Persist.Postgresql
+import Data.Yaml
 
 -- | Config datatype used for parsing.
 data Config = Config
   { acceptedVersion :: ![Int] -- ^ Client version accepted by server
-  , port :: !Int              -- ^ Port to run server on
-  , database :: !Value        -- ^ Database connection info
+  , serverPort :: !Int              -- ^ Port to run server on
+  , postgresConf :: !PostgresConf        -- ^ Database connection info
   } deriving Show
 
--- | Derives aeson toJSON and fromJSON instances for Config.
-$(deriveJSON defaultOptions ''Config)
+-- | Derives aeson fromJSON instances for Config.
+$(deriveFromJSON defaultOptions ''Config)
 
--- | Get PostgresConf from yaml file.
-getPostgresConf :: IO PostgresConf
-getPostgresConf = do
-  Just yaml <- decodeFile "etc/openage/masterserver.yaml"
-  conf <- parseMonad loadConfig $ database yaml
-  applyEnv (conf :: PostgresConf)
-
--- | Get port from yaml file.
-getPort :: IO Int
-getPort = do
-  Just yaml <- decodeFile "etc/openage/masterserver.yaml"
-  return $ port yaml
-
--- | Get accepted version from yaml file.
-getVersion :: IO [Int]
-getVersion = do
-  Just yaml <- decodeFile "etc/openage/masterserver.yaml"
-  return $ acceptedVersion yaml
-
+loadConf :: FilePath -> IO Config
+loadConf path = do
+  eitherConf <- decodeFileEither path
+  case eitherConf of
+    Right conf -> return conf
+    Left _ -> error "Failed loading Config"
