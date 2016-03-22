@@ -23,6 +23,7 @@ library
   ghc-options:         -O2 -Wall -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   hs-source-dirs:      src
   exposed-modules:     Masterserver.Protocol
+                     , Masterserver.Args
                      , Masterserver.Config
                      , Masterserver.Database
                      , Masterserver.Server

@@ -18,7 +18,6 @@ module Main where
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Concurrent.Async
-import System.Console.GetOpt
 import Control.Exception.Base (finally)
 import Control.Monad
 import Control.Monad.Reader
@@ -33,29 +32,23 @@ import Data.Maybe
 import Data.Text as T
 import Data.Version (makeVersion)
 import Database.Persist
-import Data.Yaml (decodeFile)
 import Network
 import Text.Printf
-import System.IO as S
+import System.Console.GetOpt
 import System.Environment
-import System.Exit
+import System.IO as S
 
 import Masterserver.Config
 import Masterserver.Database
 import Masterserver.Protocol as P
 import Masterserver.Server
-
-data Options = Options  { optConfPath :: FilePath}
-
-startOptions :: Options
-startOptions = Options  { optConfPath = "etc/openage/masterserver.yaml"
-                        }
+import Masterserver.Args
 
 main :: IO ()
 main = withSocketsDo $ do
   args <- getArgs
   -- Parse options, getting a list of option actions
-  let (actions, nonOptions, errors) = getOpt RequireOrder options args
+  let (actions, _, _) = getOpt RequireOrder options args
   -- Here we thread startOptions through all supplied option actions
   opts <- L.foldl (>>=) (return startOptions) actions
   let Options { optConfPath = path} = opts
@@ -69,22 +62,6 @@ main = withSocketsDo $ do
       printf "Accepted connection from %s: %s\n" host (show clientPort)
       forkFinally (runReaderT (talk handle server host) conf) (\_ ->
         printf "Connection from %s closed\n" host >> hClose handle)
-
-options :: [ OptDescr (Options -> IO Options) ]
-options =
-     [ Option "c" ["config"]
-        (ReqArg
-            (\arg opt -> return opt { optConfPath = arg })
-            "FILE")
-        "Input string"
-    , Option "h" ["help"]
-        (NoArg
-            (\_ -> do
-                prg <- getProgName
-                S.hPutStrLn stderr (usageInfo prg options)
-                exitSuccess))
-        "Show help"
-    ]
 
 talk :: (MonadReader Config m, MonadIO m)
      => Handle
