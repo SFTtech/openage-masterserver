@@ -3,8 +3,6 @@
 {-# LANGUAGE RecordWildCards #-}
 -- | Better performance for strict records
 {-# OPTIONS_GHC -funbox-strict-fields #-}
--- | Ignore orphaned instances for Version aeson instances
-{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 ------------------------------------------------------------------------------
 -- |
@@ -125,8 +123,8 @@ newParticipant :: AuthPlayerName -> Bool -> Participant
 newParticipant parName parReady = Participant{ parCiv="None"
                                              , parTeam=0, ..}
 
+-- | Create automatically derived json protocol instances
 Prelude.concat <$> mapM (deriveJSON defaultOptions) [''InMessage,
                                                      ''Participant,
                                                      ''Game,
-                                                     ''OutMessage,
-                                                     ''Version]
+                                                     ''OutMessage]
