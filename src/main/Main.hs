@@ -34,8 +34,6 @@ import Data.Version (makeVersion)
 import Database.Persist
 import Network
 import Text.Printf
-import System.Console.GetOpt
-import System.Environment
 import System.IO as S
 
 import Masterserver.Config
@@ -46,13 +44,7 @@ import Masterserver.Args
 
 main :: IO ()
 main = withSocketsDo $ do
-  args <- getArgs
-  -- Parse options, getting a list of option actions
-  let (actions, _, _) = getOpt RequireOrder options args
-  -- Here we thread startOptions through all supplied option actions
-  opts <- L.foldl (>>=) (return startOptions) actions
-  let Options { optConfPath = path} = opts
-  conf <- loadConf path
+  conf <- parseOpts
   let port = serverPort conf
   server <- newServer
   sock <- listenOn (PortNumber (fromIntegral port))
