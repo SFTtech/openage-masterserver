@@ -2,9 +2,9 @@
 # version 1.0.0
 acceptedVersion: [1,0,0]
 # Port server is running on
-port: 1234
+serverPort: 1234
 # Database connection information
-database:
+postgresConf:
   host: <host>
   database: <database>
   password: <pass>

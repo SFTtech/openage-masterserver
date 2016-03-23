@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -19,6 +20,7 @@ import Control.Concurrent.STM
 import Control.Concurrent.Async
 import Control.Exception.Base (finally)
 import Control.Monad
+import Control.Monad.Reader
 import Crypto.BCrypt
 import Data.Aeson
 import Data.ByteString as B
@@ -38,80 +40,92 @@ import Masterserver.Config
 import Masterserver.Database
 import Masterserver.Protocol as P
 import Masterserver.Server
+import Masterserver.Args
 
 main :: IO ()
 main = withSocketsDo $ do
-  port <- getPort
+  conf <- parseOpts
+  let port = serverPort conf
   server <- newServer
   sock <- listenOn (PortNumber (fromIntegral port))
   printf "Listening on port %d\n" port
   forever $ do
       (handle, host, clientPort) <- accept sock
       printf "Accepted connection from %s: %s\n" host (show clientPort)
-      forkFinally (talk handle server host) (\_ ->
+      forkFinally (runReaderT (talk handle server host) conf) (\_ ->
         printf "Connection from %s closed\n" host >> hClose handle)
 
-talk :: Handle -> Server -> HostName -> IO()
+talk :: (MonadReader Config m, MonadIO m)
+     => Handle
+     -> Server
+     -> HostName
+     -> m ()
 talk handle server hostname = do
-  S.hSetNewlineMode handle universalNewlineMode
-  S.hSetBuffering handle LineBuffering
+  liftIO $ S.hSetNewlineMode handle universalNewlineMode
+  liftIO $ S.hSetBuffering handle LineBuffering
   checkVersion handle
   mayClient <- checkAddClient handle server hostname
   case mayClient of
-    Just client@Client{..} -> do
+    Just client@Client{..} -> liftIO $ do
       sendMessage handle "Login success."
       runClient server client
         `finally` removeClientLeave server clientName
     Nothing ->
-      sendError handle "Login failed."
+      liftIO $ sendError handle "Login failed."
 
--- | Compare Version to own
-checkVersion :: S.Handle -> IO ()
+-- | Compare Version to the one speciefied in the environment.
+checkVersion :: (MonadReader Config m, MonadIO m)
+             => S.Handle
+             -> m ()
 checkVersion handle = do
-  verJson <- B.hGetLine handle
-  myVersion <- getVersion
+  verJson <- liftIO $ B.hGetLine handle
+  myVersion <- asks acceptedVersion
   if ( peerProtocolVersion
      . fromJust
      . decode
      . BL.fromStrict) verJson == makeVersion myVersion
     then
-      sendMessage handle "Version accepted."
-    else do
+      liftIO $ sendMessage handle "Version accepted."
+    else liftIO $ do
       sendError handle "Incompatible Version."
       thread <- myThreadId
       killThread thread
 
 -- | Get login credentials from handle, add client to servers
 -- clientmap and return Client
-checkAddClient :: Handle -> Server -> HostName -> IO(Maybe Client)
+checkAddClient :: (MonadReader Config m, MonadIO m)
+               => Handle
+               -> Server
+               -> HostName
+               -> m (Maybe Client)
 checkAddClient handle server@Server{..} hostname = do
-  loginJson <- B.hGetLine handle
+  loginJson <- liftIO $ B.hGetLine handle
   case (decode . BL.fromStrict) loginJson of
     Just Login{..} -> do
       let toBs = BC.pack . T.unpack
       Just (Entity _ Player{..}) <- getPlayer loginName
       if validatePassword playerPassword (toBs loginPassword)
         then do
-          clientMap <- readTVarIO clients
-          client <- newClient playerUsername hostname handle
+          clientMap <- liftIO $ readTVarIO clients
+          client <- liftIO $ newClient playerUsername hostname handle
           if member playerUsername clientMap
             then do
-              sendChannel (clientMap!playerUsername) Logout
-              atomically $ addClient server client
+              liftIO $ sendChannel (clientMap!playerUsername) Logout
+              liftIO $ atomically $ addClient server client
               return $ Just client
             else do
-              atomically $ addClient server client
+              liftIO $ atomically $ addClient server client
               return $ Just client
         else return Nothing
     Just AddPlayer{..} -> do
-      hash <- hashPw pw
+      hash <- liftIO $ hashPw pw
       res <- addPlayer name hash
-      maybe (sendError handle "Name taken."
+      maybe (liftIO (sendError handle "Name taken.")
              >> checkAddClient handle server hostname)
-        (\_ -> sendMessage handle "Player successfully added."
+        (\_ -> liftIO (sendMessage handle "Player successfully added.")
                >> checkAddClient handle server hostname) res
     _ -> do
-      sendError handle "Unknown Format."
+      liftIO $ sendError handle "Unknown Format."
       return Nothing
 
 -- | Uses BCrypt to hash pw before writing it to db

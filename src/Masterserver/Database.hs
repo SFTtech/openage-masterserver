@@ -23,6 +23,7 @@ import Database.Persist
 import Database.Persist.Postgresql as PO
 import Database.Persist.TH
 import Data.Text
+import Control.Monad.Reader
 
 import Masterserver.Config
 
@@ -35,22 +36,28 @@ Player
 |]
 
 -- | Add Player to table player
-addPlayer :: Text                       -- ^ Players unique account-name
+addPlayer :: (MonadReader Config m, MonadIO m)
+          => Text                       -- ^ Players unique account-name
           -> BC.ByteString              -- ^ Players salted password hash
-          -> IO (Maybe (PO.Key Player)) -- ^ Resulting Player
+          -> m (Maybe (PO.Key Player))
+          -- ^ Resulting Player
 addPlayer name pw =
   runPost $ PO.insertUnique $ Player name pw
 
 -- | Get Player by name
-getPlayer :: Text                         -- ^ Players unique name
-          -> IO(Maybe (PO.Entity Player)) -- ^ Persist Entity for Player
+getPlayer :: (MonadReader Config m, MonadIO m)
+          => Text
+          -- ^ Players unique name
+          -> m (Maybe (PO.Entity Player))
+          -- ^ Persist Entity for Player
 getPlayer pName =
   runPost $ PO.getBy $ UniqueUsername pName
 
 -- | Run a persist transaction with config credentials
-runPost :: SqlPersistT IO a -- ^ Database access action
-        -> IO a             -- ^ actions result
+runPost :: (MonadReader Config m, MonadIO m)
+        => SqlPersistT IO a -- ^ Database access action
+        -> m a              -- ^ actions result
 runPost action = do
-  conf <- getPostgresConf
-  pool <- createPoolConfig conf
-  PO.runPool conf action pool
+  conf <- asks postgresConf
+  pool <- liftIO $ createPoolConfig conf
+  liftIO $ PO.runPool conf action pool

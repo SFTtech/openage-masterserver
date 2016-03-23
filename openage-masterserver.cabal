@@ -23,6 +23,7 @@ library
   ghc-options:         -O2 -Wall -dynamic -threaded -fwarn-tabs -fwarn-incomplete-uni-patterns -fwarn-incomplete-record-updates
   hs-source-dirs:      src
   exposed-modules:     Masterserver.Protocol
+                     , Masterserver.Args
                      , Masterserver.Config
                      , Masterserver.Database
                      , Masterserver.Server
@@ -55,10 +56,12 @@ executable openage-masterserver
                      , bytestring >= 0.10
                      , containers >= 0.5
                      , network >= 2.6
+                     , mtl
                      , persistent
                      , stm >= 2.4
                      , text
                      , openage-masterserver
+                     , yaml >= 0.8
   default-language:    Haskell2010
 
 executable openage-masterserver-test
