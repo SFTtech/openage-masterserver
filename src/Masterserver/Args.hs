@@ -4,7 +4,7 @@
 -----------------------------------------------------------------------------
 -- |
 -- Copyright 2016-2016 the openage authors. See copying.md for legal info.
--- Module: Masterserver.Config
+-- Module: Masterserver.Args
 --
 -- This Module defines the masterservers commandline argument parser.
 
