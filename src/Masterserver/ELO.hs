@@ -1,3 +1,10 @@
+------------------------------------------------------------------------------
+-- |
+-- Copyright 2016-2017 the openage authors. See copying.md for legal info.
+-- Module: Masterserver: Masterserver.ELO
+--
+-- This Module defines the ELO Algorithm used for ranking in the masterserver
+------------------------------------------------------------------------------
 module ELO where
 
 -- tuning params, currently using some defaults
