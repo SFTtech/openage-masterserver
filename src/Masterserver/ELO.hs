@@ -1,7 +1,12 @@
 module ELO where
--- tuning params
+
+-- tuning params, currently using some defaults
+-- the famous k-factor, basically how quickly you ascend or descend
+-- should probably be a lot lower, for example k=24 so we don't rank around too quickly
 k = 64
+-- expected score magnification
 base = 10
+-- how many points of difference we require for one magnification to happen
 scale = 400
 
 
