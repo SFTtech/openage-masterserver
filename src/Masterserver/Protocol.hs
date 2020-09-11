@@ -34,7 +34,7 @@ import Data.Aeson.TH
 import Data.Map.Strict as Map
 import Data.Text(Text)
 import Data.Version
-import Network
+import Network.Socket
 
 -- | Messages received by server
 data InMessage
