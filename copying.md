@@ -12,7 +12,8 @@ _the openage authors_ are:
 | Michael Enßlin              | mic_e                       | michael@ensslin.cc               |
 | Markus Otto                 | zuntrax                     | otto@fs.tum.de                   |
 | Janosch Kindl               | kindl                       | janoschkindl+openage@gmail.com   |
-| Tobias Heider               | tobhe                       | tobias.heider@stud.ifi.lmu.de    |     
+| Tobias Heider               | tobhe                       | tobias.heider@stud.ifi.lmu.de    |
+| Rafael X. Morales Georgi    | chocoladisco                | chocoladisco@gmail.com           |
 
 If you're a first-time commiter, add yourself to the above list. This is not
 just for legal reasons, but also to keep an overview of all those nicknames.
