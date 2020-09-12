@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TypeApplications #-}
 ------------------------------------------------------------------------------
 -- |
 -- Copyright 2016-2016 the openage authors. See copying.md for legal info.
@@ -12,7 +13,6 @@
 module Main where
 
 import Data.Key
-import Control.Monad
 import Control.Concurrent.Async
 import System.Environment
 import Text.Printf
@@ -24,10 +24,12 @@ import Data.ByteString.Char8 as B
 import System.IO
 import Data.Text as TE
 import Data.Text.IO as T
-import Network
+import Network.Socket
 
 import Masterserver.Server
 import Masterserver.Protocol as P
+
+type Continue = Bool 
 
 main :: IO ()
 main = withSocketsDo $ do
@@ -35,8 +37,12 @@ main = withSocketsDo $ do
   printInit
   case args of
     [host, port] -> do
-      handle <- connectTo host $ PortNumber
-        $ fromIntegral (read port :: Int)
+      let hints = defaultHints { addrSocketType = Stream }
+      addr:_ <- getAddrInfo (Just hints) (Just host) (Just port)
+      sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
+      connect sock (addrAddress addr)
+      printf "Connected\n"
+      handle <- socketToHandle sock ReadWriteMode
       hSetBuffering handle NoBuffering
       handleVersion handle
       getSendCredentials handle
@@ -85,52 +91,43 @@ handleAnswer handle = do
 
 mainLoop :: Handle -> IO ()
 mainLoop handle = do
-  _ <- race (forever $ handleAnswer handle) (handleLobbyInput handle)
-  return ()
+  ans <- async $ handleAnswer handle
+  inp <- async $ handleLobbyInput handle
+  -- Weird behavior, seems like it stuck (deadlocking?) when using
+  -- waitEitherCancel or the equivalent 'race' function.
+  result <- waitEither ans inp
+  case result of
+    Right True -> 
+      printf "Exit requested, proceeding...\n"
+    _ -> 
+      mainLoop handle
 
-handleLobbyInput :: Handle -> IO ()
-handleLobbyInput handle = do
-  input <- T.getLine
-  case TE.words input of
-    "chat" : content -> do
+handleLobbyInput :: Handle -> IO Continue
+handleLobbyInput handle = go =<< TE.words <$> T.getLine
+  where
+    go ["exit"] =
+      pure True
+    go command = do
+      handleGeneric command
+      pure False
+
+    handleGeneric ("chat":content) =
       sendEncoded handle $ ChatFromClient $ TE.unwords content
-      handleLobbyInput handle
-    ["playerconfig", civ, team, rdy] -> do
+    handleGeneric ["playerconfig", civ, team, rdy] =
       sendEncoded handle (PlayerConfig civ ((read . TE.unpack) team)
-                          ((read . TE.unpack) rdy))
-      handleLobbyInput handle
-    ["gameconfig", gMap, mode, num] -> do
+                                           ((read . TE.unpack) rdy))
+    handleGeneric ["gameconfig", gMap, mode, num] = 
       sendEncoded handle (GameConfig gMap mode ((read . TE.unpack) num))
-      handleLobbyInput handle
-    ["gameover"] -> do
-      sendEncoded handle GameOver
-      handleLobbyInput handle
-    ["join", name] -> do
-      sendEncoded handle $ GameJoin name
-      handleLobbyInput handle
-    ["info"] -> do
-      sendEncoded handle GameInfo
-      handleLobbyInput handle
-    ["init", name, gameMap, players] -> do
+    handleGeneric ["gameover"] = sendEncoded handle GameOver
+    handleGeneric ["join", name] = sendEncoded handle $ GameJoin name
+    handleGeneric ["info"] = sendEncoded handle GameInfo
+    handleGeneric ["init", name, gameMap, players] =
       sendGameInit handle name gameMap $ (read. TE.unpack) players
-      handleLobbyInput handle
-    ["query"] -> do
-      sendGameQuery handle
-      handleLobbyInput handle
-    ["leave"] -> do
-      sendEncoded handle GameLeave
-      handleLobbyInput handle
-    ["start"] -> do
-      sendEncoded handle GameStart
-      handleLobbyInput handle
-    ["exit"] ->
-      printf "exiting testclient...\n"
-    ["help"] -> do
-      printCommands
-      handleLobbyInput handle
-    _ -> do
-      printf "Command not found.\n"
-      handleLobbyInput handle
+    handleGeneric ["query"] = sendGameQuery handle
+    handleGeneric ["leave"] = sendEncoded handle GameLeave
+    handleGeneric ["start"] = sendEncoded handle GameStart
+    handleGeneric ["help"] = printCommands
+    handleGeneric _ = printf "Command not found.\n"
 
 printInit :: IO ()
 printInit = do

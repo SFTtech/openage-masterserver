@@ -1,3 +1,6 @@
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -20,6 +23,7 @@ module Masterserver.Database where
 
 import Data.ByteString.Char8 as BC
 import Database.Persist
+import Database.Persist.Sql
 import Database.Persist.Postgresql as PO
 import Database.Persist.TH
 import Data.Text
@@ -46,6 +50,11 @@ getPlayer :: Text                         -- ^ Players unique name
           -> IO(Maybe (PO.Entity Player)) -- ^ Persist Entity for Player
 getPlayer pName =
   runPost $ PO.getBy $ UniqueUsername pName
+
+-- | Run the migrations, creating the database if required.
+createDB :: IO ()
+createDB = 
+  runPost $ runMigration migrateAll
 
 -- | Run a persist transaction with config credentials
 runPost :: SqlPersistT IO a -- ^ Database access action

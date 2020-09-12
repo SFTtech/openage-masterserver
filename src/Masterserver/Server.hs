@@ -23,7 +23,7 @@ import Data.ByteString.Lazy as BL
 import Data.List as L
 import Data.Map.Strict as Map
 import Data.Text
-import Network
+import Network.Socket
 import System.IO as S
 
 import Masterserver.Protocol as P

@@ -30,7 +30,7 @@ import Data.Maybe
 import Data.Text as T
 import Data.Version (makeVersion)
 import Database.Persist
-import Network
+import Network.Socket hiding (Broadcast)
 import Text.Printf
 import System.IO as S
 
@@ -39,17 +39,34 @@ import Masterserver.Database
 import Masterserver.Protocol as P
 import Masterserver.Server
 
+extractIP :: SockAddr -> String
+extractIP (SockAddrInet _ host) =
+  let (a, b, c, d) = hostAddressToTuple host
+  in  show a <> "." <> show b <> "." <> show c <> "." <> show d
+extractIP (SockAddrInet6 _ _ host _) = show host
+extractIP x                          = show x
+
 main :: IO ()
-main = withSocketsDo $ do
-  port <- getPort
-  server <- newServer
-  sock <- listenOn (PortNumber (fromIntegral port))
-  printf "Listening on port %d\n" port
-  forever $ do
-      (handle, host, clientPort) <- accept sock
-      printf "Accepted connection from %s: %s\n" host (show clientPort)
-      forkFinally (talk handle server host) (\_ ->
-        printf "Connection from %s closed\n" host >> hClose handle)
+main = createDB *> go
+  where
+    go = withSocketsDo $ do
+      port <- getPort
+      server <- newServer
+      let hints = defaultHints { addrSocketType = Stream }
+      addr:_ <- getAddrInfo (Just hints) (Just "0.0.0.0") (Just $ show port)
+      sock <- socket (addrFamily addr) (addrSocketType addr) (addrProtocol addr)
+      setSocketOption sock ReuseAddr 1
+      bind sock  (addrAddress addr)
+      listen sock 1024
+      printf "Listening on port %d\n" port
+      forever $ do
+          (clientSock, host) <- accept sock
+          handle <- socketToHandle clientSock ReadWriteMode
+          let clientIP = extractIP host
+          printf "Accepted connection from %s\n" clientIP
+          forkFinally (talk handle server clientIP) (\e -> do
+            print e
+            printf "Connection from %s closed\n" clientIP >> hClose handle)
 
 talk :: Handle -> Server -> HostName -> IO()
 talk handle server hostname = do
